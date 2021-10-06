@@ -1,4 +1,4 @@
-.. _swh-py-template:
+.. _swh-perfecthash:
 
 .. include:: README.rst
 

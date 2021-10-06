@@ -48,9 +48,10 @@ setup(
     packages=find_packages(),  # packages's modules
     install_requires=parse_requirements(None, "swh"),
     tests_require=parse_requirements("test"),
-    setup_requires=["setuptools-scm"],
+    setup_requires=["setuptools-scm", "cffi"],
     use_scm_version=True,
     extras_require={"testing": parse_requirements("test")},
+    cffi_modules=["swh/perfecthash/build.py:ffibuilder"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "Intended Audience :: Developers",

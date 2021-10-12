@@ -1,15 +1,18 @@
 .. _swh-perfecthash:
 
-.. include:: README.rst
+Software Heritage - Object storage perfect hash
+===============================================
+
+Low level management for read-only content-addressable object storage
+indexed with a perfect hash table.
+
+
+Reference Documentation
+-----------------------
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-
-Indices and tables
-------------------
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   /apidoc/swh.perfecthash
+   benchmarks
+   format

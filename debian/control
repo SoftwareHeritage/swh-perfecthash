@@ -1,0 +1,24 @@
+Source: swh-perfecthash
+Maintainer: Software Heritage developers <swh-devel@inria.fr>
+Section: python
+Priority: optional
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-python (>= 3),
+ python3-all,
+ python3-cffi,
+ python3-pytest,
+ python3-setuptools,
+ python3-setuptools-scm,
+# The above dependencies are automatically generated. Add extra dependencies below:
+ libcmph-dev,
+ python3-all-dev,
+Rules-Requires-Root: no
+Standards-Version: 4.6.0
+Homepage: https://forge.softwareheritage.org/source/swh-perfecthash
+
+Package: python3-swh.perfecthash
+Architecture: any
+Depends: ${misc:Depends}, ${python3:Depends},
+ ${shlibs:Depends},
+Description: Software Heritage Perfect Hash

@@ -1,0 +1,5 @@
+swh-perfecthash (0.1.1-1~swh1) unstable-swh; urgency=medium
+
+  * Initial release
+
+ -- Loïc Dachary <loic@dachary.org>  Thu, 09 Dec 2021 10:42:36 +0100

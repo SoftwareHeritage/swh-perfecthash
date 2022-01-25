@@ -11,7 +11,7 @@
 
 #define SHARD_OFFSET_MAGIC 32
 #define SHARD_OFFSET_HEADER 512
-#define SHARD_KEY_LEN 20
+#define SHARD_KEY_LEN 32
 extern const int shard_key_len;
 
 #define SHARD_MAGIC "SWHShard"

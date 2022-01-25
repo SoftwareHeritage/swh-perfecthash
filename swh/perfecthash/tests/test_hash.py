@@ -1,4 +1,4 @@
-# Copyright (C) 2021  The Software Heritage developers
+# Copyright (C) 2021-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -18,10 +18,10 @@ def test_all(tmpdir):
     os.truncate(f, 10 * 1024 * 1024)
 
     s = Shard(f).create(2)
-    keyA = b"A" * 32
+    keyA = b"A" * Shard.key_len()
     objectA = b"AAAA"
     s.write(keyA, objectA)
-    keyB = b"B" * 32
+    keyB = b"B" * Shard.key_len()
     objectB = b"BBBB"
     s.write(keyB, objectB)
     s.save()
@@ -48,7 +48,7 @@ def payload(request):
 #
 def test_build_speed(request, tmpdir, payload):
     start = time.time()
-    os.system(f"cp {payload} {tmpdir}/shard ; rm {tmpdir}/shard")
+    os.system(f"cp {payload} {tmpdir}/shard")
     baseline = time.time() - start
     write_duration, build_duration, _ = shard_build(request, tmpdir, payload)
     duration = write_duration + build_duration
@@ -108,8 +108,8 @@ def shard_build(request, tmpdir, payload):
     size = 0
     with open(payload, "rb") as f:
         while True:
-            key = f.read(32)
-            if len(key) < 32:
+            key = f.read(Shard.key_len())
+            if len(key) < Shard.key_len():
                 break
             assert key not in objects
             object = f.read(random.randrange(512, object_max_size))
@@ -128,8 +128,8 @@ def shard_build(request, tmpdir, payload):
     size = 0
     with open(payload, "rb") as f:
         while True:
-            key = f.read(32)
-            if len(key) < 32:
+            key = f.read(Shard.key_len())
+            if len(key) < Shard.key_len():
                 break
             if key not in objects:
                 break

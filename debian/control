@@ -19,6 +19,9 @@ Homepage: https://forge.softwareheritage.org/source/swh-perfecthash
 
 Package: python3-swh.perfecthash
 Architecture: any
-Depends: ${misc:Depends}, ${python3:Depends},
+Depends:
+ python3-cffi,
+ ${misc:Depends},
+ ${python3:Depends},
  ${shlibs:Depends},
 Description: Software Heritage Perfect Hash

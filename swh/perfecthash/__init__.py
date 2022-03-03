@@ -1,4 +1,4 @@
-# Copyright (C) 2021  The Software Heritage developers
+# Copyright (C) 2021-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -33,6 +33,10 @@ class Shard:
     def __del__(self):
         lib.shard_destroy(self.shard)
 
+    @staticmethod
+    def key_len():
+        return lib.shard_key_len
+
     def create(self, objects_count: int) -> "Shard":
         """Wipe out the content of the Read Shard. It must be followed by
         **object_count** calls to the **write** method otherwise the content
@@ -62,7 +66,7 @@ class Shard:
         """Create the perfect hash table the **lookup** method
         relies on to find the content of the objects.
 
-        It must be called after **create** an **write** otherwise the
+        It must be called after **create** and **write** otherwise the
         content of the Read Shard will be inconsistent.
 
         Returns:
@@ -103,4 +107,6 @@ class Shard:
         Returns:
             0 on success, -1 on error.
         """
+        if len(key) != Shard.key_len():
+            raise ValueError(f"key length is {len(key)} instead of {Shard.key_len()}")
         return lib.shard_object_write(self.shard, key, object, len(object))

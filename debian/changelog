@@ -1,8 +1,10 @@
-swh-perfecthash (0.1.1-2~swh3~bpo10+1) buster-swh; urgency=medium
+swh-perfecthash (0.1.2-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.1.2     - (tagged by Loïc Dachary
+    <loic@dachary.org> on 2022-01-25 15:48:25 +0100)
+  * Upstream changes:     - sanity checks on the key length
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 03 Mar 2022 11:09:35 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 03 Mar 2022 11:24:09 +0000
 
 swh-perfecthash (0.1.1-2~swh3) unstable-swh; urgency=medium
 

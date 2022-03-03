@@ -113,6 +113,10 @@ TEST(HashTest, Many) {
     ASSERT_GE(close(open(tmpfile.c_str(), O_CREAT, 0777)), 0);
     ASSERT_GE(truncate(tmpfile.c_str(), 10 * 1024 * 1024), 0);
 
+    std::random_device dev;
+    std::mt19937 prng(dev());
+    std::uniform_int_distribution<int> rand(0, 80 * 1024);
+
     //
     // Populate a Read Shard with multiple objects (objects_count)
     // The object content and their keys are from a random source
@@ -125,8 +129,8 @@ TEST(HashTest, Many) {
     int objects_count = 10;
     ASSERT_GE(shard_create(shard, objects_count), 0);
     for (int i = 0; i < objects_count; i++) {
-        std::string key = gen_random(32);
-        std::string object = gen_random(50);
+        std::string key = gen_random(SHARD_KEY_LEN);
+        std::string object = gen_random(rand(prng));
         key2object[key] = object;
         std::cout << key << std::endl;
         ASSERT_GE(shard_object_write(shard, key.c_str(), object.c_str(),

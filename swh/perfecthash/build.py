@@ -1,4 +1,4 @@
-# Copyright (C) 2021  The Software Heritage developers
+# Copyright (C) 2021-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -29,6 +29,7 @@ int shard_load(shard_t* shard);
 int shard_lookup_object_size(shard_t *shard, const char *key, uint64_t *object_size);
 int shard_lookup_object(shard_t *shard, char *object, uint64_t object_size);
 
+extern const int shard_key_len;
 """
 )
 

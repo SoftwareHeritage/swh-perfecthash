@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021  The Software Heritage developers
+ * Copyright (C) 2021-2022  The Software Heritage developers
  * See the AUTHORS file at the top-level directory of this distribution
  * License: GNU General Public License version 3, or any later version
  * See top-level LICENSE file for more information
@@ -12,6 +12,7 @@
 #define SHARD_OFFSET_MAGIC 32
 #define SHARD_OFFSET_HEADER 512
 #define SHARD_KEY_LEN 32
+extern const int shard_key_len;
 
 #define SHARD_MAGIC "SWHShard"
 #define SHARD_VERSION 1

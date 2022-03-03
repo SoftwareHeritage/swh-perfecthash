@@ -18,3 +18,4 @@ swh/perfecthash/hash.gcda
 swh/perfecthash/hash.gcno
 swh/perfecthash/test_hash.lcov
 swh/perfecthash/html
+*.so

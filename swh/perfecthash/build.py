@@ -3,6 +3,8 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import pathlib
+
 from cffi import FFI
 
 ffibuilder = FFI()
@@ -33,6 +35,13 @@ extern const int shard_key_len;
 """
 )
 
+library_dirs = []
+extra_compile_args = ["-D_FILE_OFFSET_BITS=64"]
+bundled_cmph = pathlib.Path(__file__).parent.parent.parent / "cmph"
+if bundled_cmph.is_dir():
+    library_dirs.append(str(bundled_cmph / "lib"))
+    extra_compile_args.append(f"-I{bundled_cmph}/include")
+
 ffibuilder.set_source(
     "swh.perfecthash._hash_cffi",
     """
@@ -41,7 +50,8 @@ ffibuilder.set_source(
     sources=["swh/perfecthash/hash.c"],
     include_dirs=["."],
     libraries=["cmph"],
-    extra_compile_args=["-D_FILE_OFFSET_BITS=64"],
+    library_dirs=library_dirs,
+    extra_compile_args=extra_compile_args,
 )  # library name, for the linker
 
 if __name__ == "__main__":

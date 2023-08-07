@@ -1,3 +1,4 @@
+.git-blame-ignore-revs
 .gitignore
 .pre-commit-config.yaml
 AUTHORS
@@ -7,6 +8,7 @@ LICENSE
 MANIFEST.in
 Makefile
 README.rst
+build_cmph.sh
 conftest.py
 mypy.ini
 pyproject.toml

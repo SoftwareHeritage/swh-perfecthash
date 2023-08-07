@@ -1,9 +1,14 @@
 def pytest_addoption(parser):
     parser.addoption(
-        "--shard-size", default=10, type=int, help="Size of the Read Shard file in MB",
+        "--shard-size",
+        default=10,
+        type=int,
+        help="Size of the Read Shard file in MB",
     )
     parser.addoption(
-        "--shard-path", default="/tmp/payload", help="Path of the Read Shard file",
+        "--shard-path",
+        default="/tmp/payload",
+        help="Path of the Read Shard file",
     )
     parser.addoption(
         "--shard-count",
@@ -18,5 +23,8 @@ def pytest_addoption(parser):
         help="Maximum size of an object in bytes",
     )
     parser.addoption(
-        "--lookups", default=10, type=int, help="Number of lookups to perform",
+        "--lookups",
+        default=10,
+        type=int,
+        help="Number of lookups to perform",
     )

@@ -27,7 +27,7 @@ The goal is to verify that manipulating up to the largest supported
 object size actually works and does not trigger problems in the
 extreme case that all objects have the maximum size.
 
-* time tox -e py3 -- --basetemp=/mnt/pytest -s --shard-path /mnt/payload --shard-size $((100 * 1024)) --object-max-size $((100 * 1024 * 1024)) -k test_build_speed
+* time tox run -e py3 -- --basetemp=/mnt/pytest -s --shard-path /mnt/payload --shard-size $((100 * 1024)) --object-max-size $((100 * 1024 * 1024)) -k test_build_speed
   number of objects = 2057, total size = 107374116576
   baseline 165.85, write_duration 327.19, build_duration 0.0062, total_duration 327.19
 
@@ -39,7 +39,7 @@ contain. The goal is to verify that creating a perfect hash with this
 many items does not require more than a fraction of the time required
 to copy the objects.
 
-* time tox -e py3 -- --basetemp=/mnt/pytest -s --shard-path /mnt/payload --shard-size $((100 * 1024)) --object-max-size $((4 * 1024)) -k test_build_speed
+* time tox run -e py3 -- --basetemp=/mnt/pytest -s --shard-path /mnt/payload --shard-size $((100 * 1024)) --object-max-size $((4 * 1024)) -k test_build_speed
   number of objects = 45973694, total size = 105903024192
   baseline 165.74, write_duration 495.07, build_duration 24.21, total_duration 519.28
 
@@ -53,7 +53,7 @@ performances. To minimize that effect, four Read Shard are created
 totaling 400GB. All objects are looked up in all shards to verify
 the lookup speed is greater than 5,000 objects per second.
 
-* time tox -e py3 -- --basetemp=/mnt/pytest -s -k test_lookup_speed --lookups $((100 * 1024 * 1024)) --shard-size $((100 * 1024)) --object-max-size $((4 * 1024)) swh/perfecthash/tests/test_hash.py  --shard-path /mnt/payload --shard-count 4
+* time tox run -e py3 -- --basetemp=/mnt/pytest -s -k test_lookup_speed --lookups $((100 * 1024 * 1024)) --shard-size $((100 * 1024)) --object-max-size $((4 * 1024)) swh/perfecthash/tests/test_hash.py  --shard-path /mnt/payload --shard-count 4
   number of objects = 45974390, total size = 105903001920
   key lookups speed = 9769.68/s
 
@@ -90,4 +90,4 @@ Common setup
 * source bench/bin/activate
 * cd swh-perfecthash
 * pip install -r requirements.txt -r requirements-test.txt tox wheel
-* tox -e py3
+* tox run -e py3

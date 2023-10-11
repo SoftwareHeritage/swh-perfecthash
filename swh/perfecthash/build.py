@@ -31,6 +31,8 @@ int shard_load(shard_t* shard);
 int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size);
 int shard_read_object(shard_t *shard, char *object, uint64_t object_size);
 
+int shard_delete(shard_t* shard, const char *key);
+
 extern const int shard_key_len;
 """
 )

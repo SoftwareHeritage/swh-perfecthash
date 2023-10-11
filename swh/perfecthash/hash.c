@@ -12,6 +12,7 @@
 #include <memory.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -106,6 +107,23 @@ int shard_write(shard_t *shard, const void *ptr, uint64_t nmemb) {
         return -1;
     }
     return 0;
+}
+
+int shard_write_zeros(shard_t *shard, uint64_t size) {
+#define BUF_SIZE 4096
+    char buf[BUF_SIZE];
+    size_t bytes_written;
+
+    memset(buf, 0, BUF_SIZE);
+    while (size > 0) {
+        if ((bytes_written = fwrite(buf, 1, MIN(size, BUF_SIZE), shard->f)) ==
+            0) {
+            return -1;
+        }
+        size -= bytes_written;
+    }
+    return 0;
+#undef BUF_SIZE
 }
 
 /***********************************************************
@@ -400,16 +418,22 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
         printf("shard_find_object: object_id\n");
         return -1;
     }
-    if (memcmp(key, object_id, SHARD_KEY_LEN) != 0) {
-        printf("shard_find_object: key mismatch");
-        return -1;
-    }
     uint64_t object_offset;
     if (shard_read_uint64_t(shard, &object_offset) < 0) {
         printf("shard_find_object: object_offset\n");
         return -1;
     }
     debug("shard_find_object: object_offset = %ld\n", object_offset);
+    /* Has the object been deleted? */
+    if (object_offset == UINT64_MAX) {
+        return 1;
+    }
+    /* We compare the key after the offset so we have a way to
+     * detect removed objects. */
+    if (memcmp(key, object_id, SHARD_KEY_LEN) != 0) {
+        printf("shard_find_object: key mismatch");
+        return -1;
+    }
     if (shard_seek(shard, object_offset, SEEK_SET) < 0) {
         printf("shard_find_object: object_offset\n");
         return -1;
@@ -453,6 +477,101 @@ int shard_load(shard_t *shard) {
     if (shard_header_load(shard) < 0)
         return -1;
     return shard_hash_load(shard);
+}
+
+/**********************************************************
+ * Open a Shard and delete an object by zeroing out its
+ * location in the hash table and its content.
+ *
+ * Returns:
+ *  0 if delete was successful,
+ *  1 if the key has already been deleted,
+ * -1 in case of error.
+ */
+int shard_delete(shard_t *shard, const char *key) {
+    cmph_uint32 h;
+    uint64_t index_offset;
+    char object_id[SHARD_KEY_LEN];
+    uint64_t object_offset;
+    uint64_t object_size;
+
+    debug("shard_delete: loading\n");
+    if (shard_open(shard, "r+") < 0) {
+        return -1;
+    }
+    if (shard_magic_load(shard) < 0) {
+        return -1;
+    }
+    if (shard_header_load(shard) < 0) {
+        return -1;
+    }
+    if (shard_hash_load(shard) < 0) {
+        return -1;
+    }
+    debug("shard_delete: looking up the key\n");
+    h = cmph_search(shard->hash, key, SHARD_KEY_LEN);
+    index_offset = shard->header.index_position + h * sizeof(shard_index_t);
+    if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
+        printf("shard_delete: index_offset\n");
+        return -1;
+    }
+    if (shard_read(shard, object_id, SHARD_KEY_LEN) < 0) {
+        printf("shard_delete: object_id\n");
+        return -1;
+    }
+    if (shard_read_uint64_t(shard, &object_offset) < 0) {
+        printf("shard_delete: object_offset\n");
+        return -1;
+    }
+    /* Has the object already been deleted? */
+    if (object_offset == UINT64_MAX) {
+        return 1;
+    }
+    /* We compare the key after the offset so we have a way to
+     * detect removed objects. */
+    if (memcmp(key, object_id, SHARD_KEY_LEN) != 0) {
+        printf("shard_delete: key mismatch");
+        return -1;
+    }
+    debug("shard_delete: reading object size\n");
+    if (shard_seek(shard, object_offset, SEEK_SET) < 0) {
+        printf("shard_delete: object_offset read\n");
+        return -1;
+    }
+    if (shard_read_uint64_t(shard, &object_size) < 0) {
+        printf("shard_delete: object_size\n");
+        return -1;
+    }
+    debug("shard_delete: filling object size and data (len: %lu) with zeros\n",
+          object_size);
+    if (shard_seek(shard, object_offset, SEEK_SET) < 0) {
+        printf("shard_delete: object_offset fill\n");
+        return -1;
+    }
+    if (shard_write_zeros(shard, sizeof(uint64_t) + object_size) < 0) {
+        printf("shard_delete: write_zeros\n");
+        return -1;
+    }
+    debug("shard_delete: writing tombstone for object offset\n");
+    if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
+        printf("shard_delete: index_offset\n");
+        return -1;
+    }
+    if (shard_write_zeros(shard, SHARD_KEY_LEN) < 0) {
+        printf("shard_delete: rewrite key\n");
+        return -1;
+    }
+    object_offset = UINT64_MAX;
+    if (shard_write(shard, &object_offset, sizeof(uint64_t)) < 0) {
+        printf("shard_delete: rewrite offset\n");
+        return -1;
+    }
+    debug("shard_delete: closing\n");
+    if (shard_close(shard) < 0) {
+        printf("shard_delete: close\n");
+        return -1;
+    }
+    return 0;
 }
 
 /**********************************************************

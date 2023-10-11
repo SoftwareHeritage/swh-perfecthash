@@ -40,9 +40,12 @@ def setrlimit(request):
 
 KEY_A = b"A" * Shard.key_len()
 KEY_B = b"B" * Shard.key_len()
+KEY_C = b"C" * Shard.key_len()
 
 OBJECT_A = b"AAAA"
 OBJECT_B = b"BBBB"
+# Use a size bigger than BUF_SIZE used in shard_write_zeros()
+OBJECT_C = b"C" * 10_000
 
 
 @pytest.fixture
@@ -51,9 +54,10 @@ def populated_shard_path(tmp_path):
     shard_path.open("w").close()
     os.truncate(shard_path, 10 * 1024 * 1024)
 
-    with ShardCreator(str(shard_path), 2) as s:
+    with ShardCreator(str(shard_path), 3) as s:
         s.write(KEY_A, OBJECT_A)
         s.write(KEY_B, OBJECT_B)
+        s.write(KEY_C, OBJECT_C)
 
     return str(shard_path)
 
@@ -62,6 +66,7 @@ def test_lookup(populated_shard_path):
     with Shard(populated_shard_path) as s:
         assert s.lookup(KEY_A) == OBJECT_A
         assert s.lookup(KEY_B) == OBJECT_B
+        assert s.lookup(KEY_C) == OBJECT_C
 
 
 def test_creator_open_without_permission(tmpdir):
@@ -173,6 +178,32 @@ def test_lookup_errors_for_mismatched_key(shard_with_mismatched_key):
     with Shard(shard_with_mismatched_key) as shard:
         with pytest.raises(RuntimeError, match=r"Mismatch"):
             shard.lookup(b"A" * Shard.key_len())
+
+
+@pytest.fixture
+def shard_with_deleted_objects_path(populated_shard_path):
+    Shard.delete(populated_shard_path, KEY_A)
+    Shard.delete(populated_shard_path, KEY_C)
+    return populated_shard_path
+
+
+def test_delete_has_zeroed_object_data(shard_with_deleted_objects_path):
+    shard_content = open(shard_with_deleted_objects_path, "rb").read()
+    assert b"AAAA" not in shard_content
+    assert b"CCCCCCCC" not in shard_content
+
+
+def test_delete_leaves_other_keys_working(shard_with_deleted_objects_path):
+    with Shard(shard_with_deleted_objects_path) as shard:
+        assert shard.lookup(KEY_B) == OBJECT_B
+
+
+def test_lookup_on_deleted_raises_key_error(shard_with_deleted_objects_path):
+    with Shard(shard_with_deleted_objects_path) as shard:
+        with pytest.raises(KeyError):
+            _ = shard.lookup(KEY_A)
+        with pytest.raises(KeyError):
+            _ = shard.lookup(KEY_C)
 
 
 @pytest.fixture

@@ -38,22 +38,30 @@ def setrlimit(request):
         logger.info("Resulting rlimit %s (%s, %s)", which, *result)
 
 
-def test_all(tmpdir):
-    f = f"{tmpdir}/shard"
-    open(f, "w").close()
-    os.truncate(f, 10 * 1024 * 1024)
+KEY_A = b"A" * Shard.key_len()
+KEY_B = b"B" * Shard.key_len()
 
-    with ShardCreator(f, 2) as s:
-        keyA = b"A" * Shard.key_len()
-        objectA = b"AAAA"
-        s.write(keyA, objectA)
-        keyB = b"B" * Shard.key_len()
-        objectB = b"BBBB"
-        s.write(keyB, objectB)
+OBJECT_A = b"AAAA"
+OBJECT_B = b"BBBB"
 
-    with Shard(f) as s:
-        assert s.lookup(keyA) == objectA
-        assert s.lookup(keyB) == objectB
+
+@pytest.fixture
+def populated_shard_path(tmp_path):
+    shard_path = tmp_path / "shard"
+    shard_path.open("w").close()
+    os.truncate(shard_path, 10 * 1024 * 1024)
+
+    with ShardCreator(str(shard_path), 2) as s:
+        s.write(KEY_A, OBJECT_A)
+        s.write(KEY_B, OBJECT_B)
+
+    return str(shard_path)
+
+
+def test_lookup(populated_shard_path):
+    with Shard(populated_shard_path) as s:
+        assert s.lookup(KEY_A) == OBJECT_A
+        assert s.lookup(KEY_B) == OBJECT_B
 
 
 def test_creator_open_without_permission(tmpdir):

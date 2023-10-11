@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from swh.perfecthash import Shard
+from swh.perfecthash import Shard, ShardCreator
 
 
 def test_all(tmpdir):
@@ -17,20 +17,17 @@ def test_all(tmpdir):
     open(f, "w").close()
     os.truncate(f, 10 * 1024 * 1024)
 
-    s = Shard(f).create(2)
-    keyA = b"A" * Shard.key_len()
-    objectA = b"AAAA"
-    s.write(keyA, objectA)
-    keyB = b"B" * Shard.key_len()
-    objectB = b"BBBB"
-    s.write(keyB, objectB)
-    s.save()
-    del s
+    with ShardCreator(f, 2) as s:
+        keyA = b"A" * Shard.key_len()
+        objectA = b"AAAA"
+        s.write(keyA, objectA)
+        keyB = b"B" * Shard.key_len()
+        objectB = b"BBBB"
+        s.write(keyB, objectB)
 
-    s = Shard(f).load()
-    assert s.lookup(keyA) == objectA
-    assert s.lookup(keyB) == objectB
-    del s
+    with Shard(f) as s:
+        assert s.lookup(keyA) == objectA
+        assert s.lookup(keyB) == objectB
 
 
 @pytest.fixture
@@ -83,7 +80,7 @@ def shard_lookups(request, tmpdir, objects):
     shard_path = f"{tmpdir}/shard"
     shards = []
     for i in range(request.config.getoption("--shard-count")):
-        shards.append(Shard(f"{shard_path}{i}").load())
+        shards.append(Shard(f"{shard_path}{i}"))
     lookups = request.config.getoption("--lookups")
     count = 0
     while True:
@@ -94,6 +91,8 @@ def shard_lookups(request, tmpdir, objects):
                 object = shard.lookup(key)
                 assert len(object) == object_size
                 count += 1
+    for shard in shards:
+        shard.close()
 
 
 def shard_build(request, tmpdir, payload):
@@ -122,7 +121,9 @@ def shard_build(request, tmpdir, payload):
     print(f"number of objects = {count}, total size = {size}")
     assert size < shard_size
     start = time.time()
-    shard = Shard(shard_path).create(len(objects))
+
+    shard = ShardCreator(shard_path, len(objects))
+    shard.create()
 
     count = 0
     size = 0
@@ -137,11 +138,7 @@ def shard_build(request, tmpdir, payload):
             assert len(object) == objects[key]
             count += 1
             size += len(object)
-            assert shard.write(key, object) >= 0, (
-                f"object count {count}/{len(objects)}, "
-                f"size {size}, "
-                f"object size {len(object)}"
-            )
+            shard.write(key, object)
     write_duration = time.time() - start
     start = time.time()
     shard.save()

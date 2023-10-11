@@ -57,6 +57,7 @@ int shard_close(shard_t *shard) {
     int r = fclose(shard->f);
     if (r < 0)
         printf("shard_close: fclose(%p): %s\n", shard->f, strerror(errno));
+    shard->f = NULL;
     return r;
 }
 

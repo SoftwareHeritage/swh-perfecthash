@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import os
 from types import TracebackType
 from typing import NewType, Optional, Type, cast
 
@@ -40,6 +41,7 @@ class ShardCreator:
             object_count: number of objects that will be written to the Shard.
         """
 
+        self.ffi = FFI()
         self.path = path
         self.object_count = object_count
         self.shard = None
@@ -77,9 +79,11 @@ class ShardCreator:
         assert self.shard is None, "create() has already been called"
 
         self.shard = lib.shard_init(self.path.encode("utf-8"))
+
+        self.ffi.errno = 0
         ret = lib.shard_create(self.shard, self.object_count)
-        if ret == -1:
-            raise RuntimeError(f"Something went wrong when creating the Shard at {self.path}")
+        if ret != 0:
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         self.written_object_count = 0
 
     def save(self) -> None:
@@ -100,9 +104,11 @@ class ShardCreator:
                 f"Only {self.written_object_count} objects were written "
                 f"when {self.object_count} were declared."
             )
+
+        self.ffi.errno = 0
         ret = lib.shard_save(self.shard)
-        if ret == -1:
-            raise RuntimeError("Something went wrong while saving the Shard")
+        if ret != 0:
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         self._destroy()
 
     def write(self, key: Key, object: HashObject) -> None:
@@ -123,9 +129,11 @@ class ShardCreator:
             raise ValueError(f"key length is {len(key)} instead of {Shard.key_len()}")
         if self.written_object_count >= self.object_count:
             raise ValueError("The declared number of objects has already been written")
+
+        self.ffi.errno = 0
         ret = lib.shard_object_write(self.shard, key, object, len(object))
         if ret != 0:
-            raise RuntimeError("Something went wrong when in `shard_object_write`")
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         self.written_object_count += 1
 
 
@@ -153,9 +161,11 @@ class Shard:
         self.ffi = FFI()
         self.path = path
         self.shard = lib.shard_init(self.path.encode("utf-8"))
+
+        self.ffi.errno = 0
         ret = lib.shard_load(self.shard)
-        if ret == -1:
-            raise RuntimeError(f"Something went wrong while loading the Shard at {self.path}")
+        if ret != 0:
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
 
     def __del__(self) -> None:
         if self.shard:
@@ -197,13 +207,23 @@ class Shard:
         """
         assert self.shard, "Shard has been closed already"
 
+        if len(key) != Shard.key_len():
+            raise ValueError(f"key length is {len(key)} instead of {Shard.key_len()}")
+
+        self.ffi.errno = 0
         object_size_pointer = self.ffi.new("uint64_t*")
         ret = lib.shard_lookup_object_size(self.shard, key, object_size_pointer)
-        if ret == -1:
-            raise RuntimeError("Something went wrong while looking up object size")
+        if ret != 0:
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         object_size = object_size_pointer[0]
         object_pointer = self.ffi.new("char[]", object_size)
         ret = lib.shard_lookup_object(self.shard, object_pointer, object_size)
-        if ret == -1:
-            raise RuntimeError("Something went wrong while reading the object data")
+        if ret != 0:
+            errno = self.ffi.errno
+            if errno == 0:
+                raise RuntimeError(
+                    f"shard_lookup_object failed. " f"{self.path} might be corrupted."
+                )
+            else:
+                raise OSError(errno, os.strerror(errno), self.path)
         return cast(HashObject, self.ffi.unpack(object_pointer, object_size))

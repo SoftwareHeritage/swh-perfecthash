@@ -1,2 +1,4 @@
 pytest
+pytest-forked
+pytest-mock
 types-cffi

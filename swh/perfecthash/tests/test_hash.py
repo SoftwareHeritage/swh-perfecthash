@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 import os
+from pathlib import Path
 import random
 import time
 
@@ -28,6 +29,101 @@ def test_all(tmpdir):
     with Shard(f) as s:
         assert s.lookup(keyA) == objectA
         assert s.lookup(keyB) == objectB
+
+
+def test_creator_open_without_permission(tmpdir):
+    path = Path(tmpdir / "no-perm")
+    path.touch()
+    # Remove all permissions
+    path.chmod(0o000)
+    shard = ShardCreator(str(path), 1)
+    with pytest.raises(PermissionError, match="no-perm"):
+        shard.create()
+
+
+# We need to run this test in a different process, otherwise
+# the rlimit change will spill over later tests.
+@pytest.mark.forked
+def test_write_above_rlimit_fsize(tmpdir):
+    import resource
+
+    resource.setrlimit(resource.RLIMIT_FSIZE, (64_000, 64_000))
+    shard = ShardCreator(f"{tmpdir}/test-shard", 1)
+    shard.create()
+    with pytest.raises(OSError, match=r"File too large.*test-shard"):
+        shard.write(b"A" * Shard.key_len(), b"A" * 72_000)
+
+
+def test_write_errors_if_too_many(tmpdir):
+    shard = ShardCreator(f"{tmpdir}/shard", 1)
+    shard.create()
+    shard.write(b"A" * Shard.key_len(), b"AAAA")
+    with pytest.raises(ValueError):
+        shard.write(b"B" * Shard.key_len(), b"BBBB")
+
+
+def test_write_errors_for_wrong_key_len(tmpdir):
+    shard = ShardCreator(f"{tmpdir}/shard", 1)
+    shard.create()
+    with pytest.raises(ValueError):
+        shard.write(b"A", b"AAAA")
+
+
+def test_creator_context_does_not_save_on_error(tmpdir, mocker):
+    import contextlib
+
+    mock_method = mocker.patch.object(ShardCreator, "save")
+    with contextlib.suppress(KeyError):
+        with ShardCreator(f"{tmpdir}/shard", 1) as _:
+            raise KeyError(42)
+    mock_method.assert_not_called()
+
+
+# We need to run this test in a different process, otherwise
+# the rlimit change will spill over later tests.
+@pytest.mark.forked
+def test_save_above_rlimit_fsize(tmpdir):
+    import resource
+
+    resource.setrlimit(resource.RLIMIT_FSIZE, (64_000, 64_000))
+    path = f"{tmpdir}/shard"
+    shard = ShardCreator(path, 1)
+    shard.create()
+    shard.write(b"A" * Shard.key_len(), b"A" * 63_500)
+    with pytest.raises(OSError, match="File too large"):
+        shard.save()
+
+
+def test_load_non_existing():
+    with pytest.raises(FileNotFoundError, match="/nonexistent"):
+        _ = Shard("/nonexistent")
+
+
+@pytest.fixture
+def corrupted_shard_path(tmpdir):
+    # taken from hash.h
+    SHARD_OFFSET_HEADER = 512
+    path = f"{tmpdir}/corrupted"
+    with ShardCreator(path, 1) as s:
+        s.write(b"A" * Shard.key_len(), b"AAAA")
+    with open(path, "rb+") as f:
+        f.seek(SHARD_OFFSET_HEADER)
+        # replace the object size (uint64_t) by something larger than file size
+        f.write(b"\x00\x00\x00\x00\x00\x00\xFF\xFF")
+    return path
+
+
+def test_lookup_failure(corrupted_shard_path):
+    with Shard(corrupted_shard_path) as shard:
+        with pytest.raises(RuntimeError, match=r"failed.*/corrupted"):
+            shard.lookup(b"A" * Shard.key_len())
+
+
+def test_lookup_errors_for_wrong_key_len(tmpdir):
+    shard = ShardCreator(f"{tmpdir}/shard", 1)
+    shard.create()
+    with pytest.raises(ValueError):
+        shard.write(b"A", b"AAAA")
 
 
 @pytest.fixture

@@ -28,7 +28,8 @@ class Shard:
 
         """
         self.ffi = FFI()
-        self.shard = lib.shard_init(path.encode("utf-8"))
+        self.path = path
+        self.shard = lib.shard_init(self.path.encode("utf-8"))
 
     def __del__(self):
         lib.shard_destroy(self.shard)
@@ -50,7 +51,9 @@ class Shard:
             self.
 
         """
-        assert lib.shard_create(self.shard, objects_count) != -1
+        assert (
+            lib.shard_create(self.shard, objects_count) != -1
+        ), f"Failed to create shard at {self.path}"
         return self
 
     def load(self) -> "Shard":
@@ -59,7 +62,7 @@ class Shard:
         Returns:
             self.
         """
-        assert lib.shard_load(self.shard) != -1
+        assert lib.shard_load(self.shard) != -1, f"Failed to load shard at {self.path}"
         return self
 
     def save(self) -> int:

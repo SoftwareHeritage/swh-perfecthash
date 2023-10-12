@@ -316,13 +316,42 @@ int shard_hash_save(shard_t *shard) {
 }
 
 int shard_save(shard_t *shard) {
+    int ret = 0;
+
     shard->header.objects_size =
         shard_tell(shard) - shard->header.objects_position;
-    return (shard_hash_create(shard) < 0 || shard_index_save(shard) < 0 ||
-            shard_hash_save(shard) < 0 || shard_header_save(shard) < 0 ||
-            shard_magic_save(shard) < 0)
-               ? -1
-               : 0;
+
+    if ((ret = shard_hash_create(shard)) < 0) {
+        printf("shard_hash_create\n");
+        return ret;
+    }
+    if ((ret = shard_index_save(shard)) < 0) {
+        printf("shard_index_save\n");
+        return ret;
+    }
+    if ((ret = shard_hash_save(shard)) < 0) {
+        printf("shard_hash_save\n");
+        return ret;
+    }
+    if ((ret = shard_header_save(shard)) < 0) {
+        printf("shard_header_save\n");
+        return ret;
+    }
+    if ((ret = shard_magic_save(shard)) < 0) {
+        printf("shard_magic_save\n");
+        return ret;
+    }
+
+    if ((ret = fdatasync(fileno(shard->f))) < 0) {
+        if (errno == EINVAL || errno == EROFS) {
+            /* File(system) does not support fdatasync. Good luck! */
+            ret = 0;
+        } else {
+            printf("fdatasync: %s\n", strerror(errno));
+            return ret;
+        }
+    }
+    return ret;
 }
 
 int shard_reset(shard_t *shard) {

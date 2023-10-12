@@ -3,7 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import NewType
+from typing import NewType, cast
 
 from cffi import FFI
 
@@ -92,7 +92,7 @@ class Shard:
         object_size = object_size_pointer[0]
         object_pointer = self.ffi.new("char[]", object_size)
         lib.shard_lookup_object(self.shard, object_pointer, object_size)
-        return self.ffi.buffer(object_pointer, object_size)
+        return cast(HashObject, self.ffi.unpack(object_pointer, object_size))
 
     def write(self, key: Key, object: HashObject) -> int:
         """Add the key/object pair to the Read Shard.

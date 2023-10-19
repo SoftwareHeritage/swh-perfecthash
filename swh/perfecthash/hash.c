@@ -291,15 +291,16 @@ int shard_index_save(shard_t *shard) {
     assert(shard->header.index_position == shard_tell(shard));
     cmph_uint32 count = cmph_size(shard->hash);
     debug("shard_index_save: count = %d\n", count);
-    shard->header.index_size = count * sizeof(uint64_t);
-    uint64_t *index = (uint64_t *)calloc(1, shard->header.index_size);
+    shard->header.index_size = count * sizeof(shard_index_t);
+    shard_index_t *index = (shard_index_t *)calloc(1, shard->header.index_size);
     for (uint64_t i = 0; i < shard->index_offset; i++) {
         cmph_uint32 h =
             cmph_search(shard->hash, shard->index[i].key, SHARD_KEY_LEN);
         debug("shard_index_save: i = %ld, h = %d, offset = %ld\n", i, h,
               shard->index[i].object_offset);
         assert(h < count);
-        index[h] = htonq(shard->index[i].object_offset);
+        memcpy(index[h].key, shard->index[i].key, SHARD_KEY_LEN);
+        index[h].object_offset = htonq(shard->index[i].object_offset);
     }
     uint64_t index_size = shard->header.index_size;
     if (shard_write(shard, (void *)index, index_size) < 0) {
@@ -382,7 +383,8 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
     debug("shard_find_object\n");
     cmph_uint32 h = cmph_search(shard->hash, key, SHARD_KEY_LEN);
     debug("shard_find_object: h = %d\n", h);
-    uint64_t index_offset = shard->header.index_position + h * sizeof(uint64_t);
+    uint64_t index_offset = shard->header.index_position +
+                            h * sizeof(shard_index_t) + SHARD_KEY_LEN;
     debug("shard_find_object: index_offset = %ld\n", index_offset);
     if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
         printf("shard_find_object: index_offset\n");

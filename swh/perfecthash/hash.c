@@ -274,6 +274,10 @@ int shard_hash_create(shard_t *shard) {
     shard->source = io_adapter(shard);
     shard->config = cmph_config_new(shard->source);
     cmph_config_set_algo(shard->config, CMPH_CHD_PH);
+    /* Set the load factor for the CHD algorithm to its maximum to waste the
+     * minimal amount of entries in the index. The resulting function should
+     * use 2.07 bits per objects.  */
+    cmph_config_set_graphsize(shard->config, 0.99);
     cmph_config_set_keys_per_bin(shard->config, 1);
     cmph_config_set_b(shard->config, 4);
     shard->hash = cmph_new(shard->config);

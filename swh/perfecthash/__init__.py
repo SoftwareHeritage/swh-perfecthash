@@ -12,7 +12,6 @@ from cffi import FFI
 from swh.perfecthash._hash_cffi import lib
 
 Key = NewType("Key", bytes)
-HashObject = NewType("HashObject", bytes)
 
 
 class ShardCreator:
@@ -111,7 +110,7 @@ class ShardCreator:
             raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         self._destroy()
 
-    def write(self, key: Key, object: HashObject) -> None:
+    def write(self, key: Key, object: bytes) -> None:
         """Add the key/object pair to the Read Shard.
 
         Args:
@@ -192,7 +191,7 @@ class Shard:
     def key_len():
         return lib.shard_key_len
 
-    def lookup(self, key: Key) -> HashObject:
+    def lookup(self, key: Key) -> bytes:
         """Fetch the object matching the key in the Read Shard.
 
         Fetching an object is O(1): one lookup in the index to obtain
@@ -226,4 +225,4 @@ class Shard:
                 )
             else:
                 raise OSError(errno, os.strerror(errno), self.path)
-        return cast(HashObject, self.ffi.unpack(object_pointer, object_size))
+        return cast(bytes, self.ffi.unpack(object_pointer, object_size))

@@ -48,12 +48,11 @@ typedef struct {
 shard_t *shard_init(const char *path);
 int shard_destroy(shard_t *shard);
 
-int shard_create(shard_t *shard, uint64_t objects_count);
+int shard_prepare(shard_t *shard, uint64_t objects_count);
 int shard_object_write(shard_t *shard, const char *key, const char *object,
                        uint64_t object_size);
-int shard_save(shard_t *shard);
+int shard_finalize(shard_t *shard);
 
 int shard_load(shard_t *shard);
-int shard_lookup_object_size(shard_t *shard, const char *key,
-                             uint64_t *object_size);
-int shard_lookup_object(shard_t *shard, char *object, uint64_t object_size);
+int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size);
+int shard_read_object(shard_t *shard, char *object, uint64_t object_size);

@@ -22,7 +22,7 @@ class ShardCreator:
 
         ``object_count`` must match the number of objects that will be added
         using the :meth:`write` method. A ``RuntimeError`` will be raised
-        on :meth:`save` in case of inconsistencies.
+        on :meth:`finalize` in case of inconsistencies.
 
         Ideally this should be done using a ``with`` statement, as such:
 
@@ -32,7 +32,7 @@ class ShardCreator:
                 for key, object in objects.items():
                     shard.write(key, object)
 
-        Otherwise, :meth:`create`, :meth:`write` and :meth:`save` must be
+        Otherwise, :meth:`prepare`, :meth:`write` and :meth:`finalize` must be
         called in sequence.
 
         Args:
@@ -46,7 +46,7 @@ class ShardCreator:
         self.shard = None
 
     def __enter__(self) -> "ShardCreator":
-        self.create()
+        self.prepare()
         return self
 
     def __exit__(
@@ -59,7 +59,7 @@ class ShardCreator:
             self._destroy()
             return
 
-        self.save()
+        self.finalize()
 
     def __del__(self):
         if self.shard:
@@ -69,26 +69,26 @@ class ShardCreator:
         _ = lib.shard_destroy(self.shard)
         self.shard = None
 
-    def create(self) -> None:
+    def prepare(self) -> None:
         """Initialize the shard.
 
         Raises:
             RuntimeError: something went wrong while creating the Shard.
         """
-        assert self.shard is None, "create() has already been called"
+        assert self.shard is None, "prepare() has already been called"
 
         self.shard = lib.shard_init(self.path.encode("utf-8"))
 
         self.ffi.errno = 0
-        ret = lib.shard_create(self.shard, self.object_count)
+        ret = lib.shard_prepare(self.shard, self.object_count)
         if ret != 0:
             raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         self.written_object_count = 0
 
-    def save(self) -> None:
-        """Save the Shard.
+    def finalize(self) -> None:
+        """Finalize the Shard.
 
-        Finalize the Shard by creating the perfect hash table
+        Write the index and the perfect hash table
         that will be used to find the content of the objects from
         their key.
 
@@ -96,7 +96,7 @@ class ShardCreator:
             RuntimeError: if the number of written objects does not match ``object_count``,
                 or if something went wrong while saving.
         """
-        assert self.shard, "create() has not been called"
+        assert self.shard, "prepare() has not been called"
 
         if self.object_count != self.written_object_count:
             raise RuntimeError(
@@ -105,7 +105,7 @@ class ShardCreator:
             )
 
         self.ffi.errno = 0
-        ret = lib.shard_save(self.shard)
+        ret = lib.shard_finalize(self.shard)
         if ret != 0:
             raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         self._destroy()
@@ -122,7 +122,7 @@ class ShardCreator:
                 have already been written.
             RuntimeError: if something wrong happens when writing the object.
         """
-        assert self.shard, "create() has not been called"
+        assert self.shard, "prepare() has not been called"
 
         if len(key) != Shard.key_len():
             raise ValueError(f"key length is {len(key)} instead of {Shard.key_len()}")
@@ -211,17 +211,17 @@ class Shard:
 
         self.ffi.errno = 0
         object_size_pointer = self.ffi.new("uint64_t*")
-        ret = lib.shard_lookup_object_size(self.shard, key, object_size_pointer)
+        ret = lib.shard_find_object(self.shard, key, object_size_pointer)
         if ret != 0:
             raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         object_size = object_size_pointer[0]
         object_pointer = self.ffi.new("char[]", object_size)
-        ret = lib.shard_lookup_object(self.shard, object_pointer, object_size)
+        ret = lib.shard_read_object(self.shard, object_pointer, object_size)
         if ret != 0:
             errno = self.ffi.errno
             if errno == 0:
                 raise RuntimeError(
-                    f"shard_lookup_object failed. " f"{self.path} might be corrupted."
+                    f"shard_read_object failed. " f"{self.path} might be corrupted."
                 )
             else:
                 raise OSError(errno, os.strerror(errno), self.path)

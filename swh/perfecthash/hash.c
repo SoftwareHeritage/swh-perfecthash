@@ -315,7 +315,7 @@ int shard_hash_save(shard_t *shard) {
     return 0;
 }
 
-int shard_save(shard_t *shard) {
+int shard_finalize(shard_t *shard) {
     int ret = 0;
 
     shard->header.objects_size =
@@ -360,7 +360,7 @@ int shard_reset(shard_t *shard) {
     return shard_seek(shard, SHARD_OFFSET_HEADER, SEEK_SET);
 }
 
-int shard_create(shard_t *shard, uint64_t objects_count) {
+int shard_prepare(shard_t *shard, uint64_t objects_count) {
     if (shard_open(shard, "w+") < 0)
         return -1;
     if (shard_reset(shard) < 0)
@@ -375,38 +375,37 @@ int shard_create(shard_t *shard, uint64_t objects_count) {
  * Lookup objects from a Read Shard
  */
 
-int shard_lookup_object_size(shard_t *shard, const char *key,
-                             uint64_t *object_size) {
-    debug("shard_lookup_object_size\n");
+int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
+    debug("shard_find_object\n");
     cmph_uint32 h = cmph_search(shard->hash, key, SHARD_KEY_LEN);
-    debug("shard_lookup_object_size: h = %d\n", h);
+    debug("shard_find_object: h = %d\n", h);
     uint64_t index_offset = shard->header.index_position + h * sizeof(uint64_t);
-    debug("shard_lookup_object_size: index_offset = %ld\n", index_offset);
+    debug("shard_find_object: index_offset = %ld\n", index_offset);
     if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
-        printf("shard_lookup_object_size: index_offset\n");
+        printf("shard_find_object: index_offset\n");
         return -1;
     }
     uint64_t object_offset;
     if (shard_read_uint64_t(shard, &object_offset) < 0) {
-        printf("shard_lookup_object_size: object_offset\n");
+        printf("shard_find_object: object_offset\n");
         return -1;
     }
-    debug("shard_lookup_object_size: object_offset = %ld\n", object_offset);
+    debug("shard_find_object: object_offset = %ld\n", object_offset);
     if (shard_seek(shard, object_offset, SEEK_SET) < 0) {
-        printf("shard_lookup_object_size: object_offset\n");
+        printf("shard_find_object: object_offset\n");
         return -1;
     }
     if (shard_read_uint64_t(shard, object_size) < 0) {
-        printf("shard_lookup_object_size: object_size\n");
+        printf("shard_find_object: object_size\n");
         return -1;
     }
-    debug("shard_lookup_object_size: object_size = %ld\n", *object_size);
+    debug("shard_find_object: object_size = %ld\n", *object_size);
     return 0;
 }
 
-int shard_lookup_object(shard_t *shard, char *object, uint64_t object_size) {
+int shard_read_object(shard_t *shard, char *object, uint64_t object_size) {
     if (shard_read(shard, (void *)object, object_size) < 0) {
-        printf("shard_lookup_object: object\n");
+        printf("shard_read_object: object\n");
         return -1;
     }
     return 0;

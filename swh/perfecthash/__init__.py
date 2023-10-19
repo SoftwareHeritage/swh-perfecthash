@@ -107,7 +107,13 @@ class ShardCreator:
         self.ffi.errno = 0
         ret = lib.shard_finalize(self.shard)
         if ret != 0:
-            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
+            errno = self.ffi.errno
+            if errno == 0:
+                raise RuntimeError(
+                    "shard_finalize failed. Was there a duplicate key by any chance?"
+                )
+            else:
+                raise OSError(self.ffi.errno, os.strerror(errno), self.path)
         self._destroy()
 
     def write(self, key: Key, object: bytes) -> None:

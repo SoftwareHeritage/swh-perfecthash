@@ -277,6 +277,9 @@ int shard_hash_create(shard_t *shard) {
     cmph_config_set_keys_per_bin(shard->config, 1);
     cmph_config_set_b(shard->config, 4);
     shard->hash = cmph_new(shard->config);
+    if (shard->hash == NULL) {
+        return -1;
+    }
     return 0;
 }
 

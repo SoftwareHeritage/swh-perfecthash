@@ -94,6 +94,15 @@ def test_finalize_above_rlimit_fsize(tmpdir):
         shard.finalize()
 
 
+def test_creator_errors_with_duplicate_key(tmpdir):
+    shard = ShardCreator(f"{tmpdir}/shard", 2)
+    shard.prepare()
+    shard.write(b"A" * Shard.key_len(), b"AAAA")
+    shard.write(b"A" * Shard.key_len(), b"AAAA")
+    with pytest.raises(RuntimeError, match="duplicate"):
+        shard.finalize()
+
+
 def test_load_non_existing():
     with pytest.raises(FileNotFoundError, match="/nonexistent"):
         _ = Shard("/nonexistent")

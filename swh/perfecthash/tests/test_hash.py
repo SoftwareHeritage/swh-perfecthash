@@ -3,14 +3,40 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import logging
 import os
 from pathlib import Path
 import random
+import resource
 import time
 
 import pytest
 
 from swh.perfecthash import Shard, ShardCreator
+
+logger = logging.getLogger(__name__)
+
+
+@pytest.fixture(scope="function", autouse=True)
+def setrlimit(request):
+
+    marker = request.node.get_closest_marker("setrlimit")
+    rlimits = []
+    if marker is not None:
+        for which, (soft, hard) in marker.args:
+            backup = resource.getrlimit(which)
+            logger.info("Saving rlimit %s (%s, %s)", which, *backup)
+            rlimits.append((which, backup))
+            logger.info("Setting rlimit %s (%s, %s)", which, soft, hard)
+            resource.setrlimit(which, (soft, hard))
+
+    yield
+
+    for which, (soft, hard) in rlimits:
+        logger.info("Resetting rlimit %s (%s, %s)", which, soft, hard)
+        resource.setrlimit(which, (soft, hard))
+        result = resource.getrlimit(which)
+        logger.info("Resulting rlimit %s (%s, %s)", which, *result)
 
 
 def test_all(tmpdir):
@@ -41,13 +67,8 @@ def test_creator_open_without_permission(tmpdir):
         shard.prepare()
 
 
-# We need to run this test in a different process, otherwise
-# the rlimit change will spill over later tests.
-@pytest.mark.forked
+@pytest.mark.setrlimit((resource.RLIMIT_FSIZE, (64_000, -1)))
 def test_write_above_rlimit_fsize(tmpdir):
-    import resource
-
-    resource.setrlimit(resource.RLIMIT_FSIZE, (64_000, 64_000))
     shard = ShardCreator(f"{tmpdir}/test-shard", 1)
     shard.prepare()
     with pytest.raises(OSError, match=r"File too large.*test-shard"):
@@ -79,13 +100,8 @@ def test_creator_context_does_not_run_finalize_on_error(tmpdir, mocker):
     mock_method.assert_not_called()
 
 
-# We need to run this test in a different process, otherwise
-# the rlimit change will spill over later tests.
-@pytest.mark.forked
+@pytest.mark.setrlimit((resource.RLIMIT_FSIZE, (64_000, -1)))
 def test_finalize_above_rlimit_fsize(tmpdir):
-    import resource
-
-    resource.setrlimit(resource.RLIMIT_FSIZE, (64_000, 64_000))
     path = f"{tmpdir}/shard"
     shard = ShardCreator(path, 1)
     shard.prepare()

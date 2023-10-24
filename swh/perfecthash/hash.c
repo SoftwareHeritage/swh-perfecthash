@@ -387,11 +387,20 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
     debug("shard_find_object\n");
     cmph_uint32 h = cmph_search(shard->hash, key, SHARD_KEY_LEN);
     debug("shard_find_object: h = %d\n", h);
-    uint64_t index_offset = shard->header.index_position +
-                            h * sizeof(shard_index_t) + SHARD_KEY_LEN;
+    uint64_t index_offset =
+        shard->header.index_position + h * sizeof(shard_index_t);
     debug("shard_find_object: index_offset = %ld\n", index_offset);
     if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
         printf("shard_find_object: index_offset\n");
+        return -1;
+    }
+    char object_id[SHARD_KEY_LEN];
+    if (shard_read(shard, object_id, SHARD_KEY_LEN) < 0) {
+        printf("shard_find_object: object_id\n");
+        return -1;
+    }
+    if (memcmp(key, object_id, SHARD_KEY_LEN) != 0) {
+        printf("shard_find_object: key mismatch");
         return -1;
     }
     uint64_t object_offset;

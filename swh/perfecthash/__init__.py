@@ -219,9 +219,16 @@ class Shard:
         object_size_pointer = self.ffi.new("uint64_t*")
         ret = lib.shard_find_object(self.shard, key, object_size_pointer)
         if ret != 0:
-            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
+            errno = self.ffi.errno
+            if errno == 0:
+                raise RuntimeError(
+                    f"shard_find_object failed. Mismatching key for {key.hex()} in the index?"
+                )
+            else:
+                raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
         object_size = object_size_pointer[0]
         object_pointer = self.ffi.new("char[]", object_size)
+        self.ffi.errno = 0
         ret = lib.shard_read_object(self.shard, object_pointer, object_size)
         if ret != 0:
             errno = self.ffi.errno

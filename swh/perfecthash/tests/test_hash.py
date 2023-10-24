@@ -152,6 +152,23 @@ def test_lookup_errors_for_wrong_key_len(tmpdir):
 
 
 @pytest.fixture
+def shard_with_mismatched_key(tmp_path):
+    path = tmp_path / "mismatched"
+    with ShardCreator(str(path), 1) as s:
+        s.write(b"A" * Shard.key_len(), b"AAAA")
+    # Replace the key in the index
+    content = path.read_bytes()
+    path.write_bytes(content.replace(b"A" * Shard.key_len(), b"B" * Shard.key_len()))
+    return str(path)
+
+
+def test_lookup_errors_for_mismatched_key(shard_with_mismatched_key):
+    with Shard(shard_with_mismatched_key) as shard:
+        with pytest.raises(RuntimeError, match=r"Mismatch"):
+            shard.lookup(b"A" * Shard.key_len())
+
+
+@pytest.fixture
 def payload(request):
     size = request.config.getoption("--shard-size")
     path = request.config.getoption("--shard-path")

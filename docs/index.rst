@@ -1,7 +1,6 @@
 .. _swh-perfecthash:
 
-Software Heritage - Object storage perfect hash
-===============================================
+.. include:: README.rst
 
 Low level management for read-only content-addressable object storage
 indexed with a perfect hash table.

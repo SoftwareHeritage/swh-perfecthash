@@ -3,78 +3,201 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import NewType
+import os
+from types import TracebackType
+from typing import NewType, Optional, Type, cast
 
 from cffi import FFI
 
 from swh.perfecthash._hash_cffi import lib
 
 Key = NewType("Key", bytes)
-HashObject = NewType("HashObject", bytes)
+
+
+class ShardCreator:
+    def __init__(self, path: str, object_count: int):
+        """Create a Shard.
+
+        The file at ``path`` will be truncated if it already exists.
+
+        ``object_count`` must match the number of objects that will be added
+        using the :meth:`write` method. A ``RuntimeError`` will be raised
+        on :meth:`finalize` in case of inconsistencies.
+
+        Ideally this should be done using a ``with`` statement, as such:
+
+        .. code-block:: python
+
+            with ShardCreator("shard", len(objects)) as shard:
+                for key, object in objects.items():
+                    shard.write(key, object)
+
+        Otherwise, :meth:`prepare`, :meth:`write` and :meth:`finalize` must be
+        called in sequence.
+
+        Args:
+            path: path to the Shard file or device that will be written.
+            object_count: number of objects that will be written to the Shard.
+        """
+
+        self.ffi = FFI()
+        self.path = path
+        self.object_count = object_count
+        self.shard = None
+
+    def __enter__(self) -> "ShardCreator":
+        self.prepare()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        if exc_type is not None:
+            self._destroy()
+            return
+
+        self.finalize()
+
+    def __del__(self):
+        if self.shard:
+            _ = lib.shard_destroy(self.shard)
+
+    def _destroy(self) -> None:
+        _ = lib.shard_destroy(self.shard)
+        self.shard = None
+
+    def prepare(self) -> None:
+        """Initialize the shard.
+
+        Raises:
+            RuntimeError: something went wrong while creating the Shard.
+        """
+        assert self.shard is None, "prepare() has already been called"
+
+        self.shard = lib.shard_init(self.path.encode("utf-8"))
+
+        self.ffi.errno = 0
+        ret = lib.shard_prepare(self.shard, self.object_count)
+        if ret != 0:
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
+        self.written_object_count = 0
+
+    def finalize(self) -> None:
+        """Finalize the Shard.
+
+        Write the index and the perfect hash table
+        that will be used to find the content of the objects from
+        their key.
+
+        Raises:
+            RuntimeError: if the number of written objects does not match ``object_count``,
+                or if something went wrong while saving.
+        """
+        assert self.shard, "prepare() has not been called"
+
+        if self.object_count != self.written_object_count:
+            raise RuntimeError(
+                f"Only {self.written_object_count} objects were written "
+                f"when {self.object_count} were declared."
+            )
+
+        self.ffi.errno = 0
+        ret = lib.shard_finalize(self.shard)
+        if ret != 0:
+            errno = self.ffi.errno
+            if errno == 0:
+                raise RuntimeError(
+                    "shard_finalize failed. Was there a duplicate key by any chance?"
+                )
+            else:
+                raise OSError(self.ffi.errno, os.strerror(errno), self.path)
+        self._destroy()
+
+    def write(self, key: Key, object: bytes) -> None:
+        """Add the key/object pair to the Read Shard.
+
+        Args:
+            key: the unique key associated with the object.
+            object: the object
+
+        Raises:
+            ValueError: if the key length is wrong, or if enough objects
+                have already been written.
+            RuntimeError: if something wrong happens when writing the object.
+        """
+        assert self.shard, "prepare() has not been called"
+
+        if len(key) != Shard.key_len():
+            raise ValueError(f"key length is {len(key)} instead of {Shard.key_len()}")
+        if self.written_object_count >= self.object_count:
+            raise ValueError("The declared number of objects has already been written")
+
+        self.ffi.errno = 0
+        ret = lib.shard_object_write(self.shard, key, object, len(object))
+        if ret != 0:
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
+        self.written_object_count += 1
 
 
 class Shard:
-    """Low level management for files indexed with a perfect hash table.
+    """Files storing objects indexed with a perfect hash table.
 
     This class allows creating a Read Shard by adding key/object pairs
     and looking up the content of an object when given the key.
+
+    This class can act as a context manager, like so:
+
+    .. code-block:: python
+
+        with Shard("shard") as shard:
+            return shard.lookup(key)
     """
 
     def __init__(self, path: str):
-        """Initialize with an existing Read Shard.
+        """Open an existing Read Shard.
 
         Args:
             path: path to an existing Read Shard file or device
 
         """
         self.ffi = FFI()
-        self.shard = lib.shard_init(path.encode("utf-8"))
+        self.path = path
+        self.shard = lib.shard_init(self.path.encode("utf-8"))
 
-    def __del__(self):
-        lib.shard_destroy(self.shard)
+        self.ffi.errno = 0
+        ret = lib.shard_load(self.shard)
+        if ret != 0:
+            raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
+
+    def __del__(self) -> None:
+        if self.shard:
+            _ = lib.shard_destroy(self.shard)
+
+    def close(self) -> None:
+        assert self.shard, "Shard has been closed already"
+
+        _ = lib.shard_destroy(self.shard)
+        self.shard = None
+
+    def __enter__(self) -> "Shard":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        self.close()
 
     @staticmethod
     def key_len():
         return lib.shard_key_len
 
-    def create(self, objects_count: int) -> "Shard":
-        """Wipe out the content of the Read Shard. It must be followed by
-        **object_count** calls to the **write** method otherwise the content
-        of the Read Shard will be inconsistent. When all objects are inserted,
-        the Read Shard must be made persistent by calling the **save** method.
-
-        Args:
-            objects_count: number of objects in the Read Shard.
-
-        Returns:
-            self.
-
-        """
-        assert lib.shard_create(self.shard, objects_count) != -1
-        return self
-
-    def load(self) -> "Shard":
-        """Open the Read Shard file in read-only mode.
-
-        Returns:
-            self.
-        """
-        assert lib.shard_load(self.shard) != -1
-        return self
-
-    def save(self) -> int:
-        """Create the perfect hash table the **lookup** method
-        relies on to find the content of the objects.
-
-        It must be called after **create** and **write** otherwise the
-        content of the Read Shard will be inconsistent.
-
-        Returns:
-            0 on success, -1 on error.
-        """
-        return lib.shard_save(self.shard)
-
-    def lookup(self, key: Key) -> HashObject:
+    def lookup(self, key: Key) -> bytes:
         """Fetch the object matching the key in the Read Shard.
 
         Fetching an object is O(1): one lookup in the index to obtain
@@ -87,26 +210,32 @@ class Shard:
         Returns:
            the object as bytes.
         """
-        object_size_pointer = self.ffi.new("uint64_t*")
-        lib.shard_lookup_object_size(self.shard, key, object_size_pointer)
-        object_size = object_size_pointer[0]
-        object_pointer = self.ffi.new("char[]", object_size)
-        lib.shard_lookup_object(self.shard, object_pointer, object_size)
-        return self.ffi.buffer(object_pointer, object_size)
+        assert self.shard, "Shard has been closed already"
 
-    def write(self, key: Key, object: HashObject) -> int:
-        """Add the key/object pair to the Read Shard.
-
-        The **create** method must have been called prior to calling
-        the **write** method.
-
-        Args:
-            key: the unique key associated with the object.
-            object: the object
-
-        Returns:
-            0 on success, -1 on error.
-        """
         if len(key) != Shard.key_len():
             raise ValueError(f"key length is {len(key)} instead of {Shard.key_len()}")
-        return lib.shard_object_write(self.shard, key, object, len(object))
+
+        self.ffi.errno = 0
+        object_size_pointer = self.ffi.new("uint64_t*")
+        ret = lib.shard_find_object(self.shard, key, object_size_pointer)
+        if ret != 0:
+            errno = self.ffi.errno
+            if errno == 0:
+                raise RuntimeError(
+                    f"shard_find_object failed. Mismatching key for {key.hex()} in the index?"
+                )
+            else:
+                raise OSError(self.ffi.errno, os.strerror(self.ffi.errno), self.path)
+        object_size = object_size_pointer[0]
+        object_pointer = self.ffi.new("char[]", object_size)
+        self.ffi.errno = 0
+        ret = lib.shard_read_object(self.shard, object_pointer, object_size)
+        if ret != 0:
+            errno = self.ffi.errno
+            if errno == 0:
+                raise RuntimeError(
+                    f"shard_read_object failed. " f"{self.path} might be corrupted."
+                )
+            else:
+                raise OSError(errno, os.strerror(errno), self.path)
+        return cast(bytes, self.ffi.unpack(object_pointer, object_size))

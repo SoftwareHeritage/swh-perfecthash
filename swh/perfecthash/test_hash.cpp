@@ -71,17 +71,17 @@ TEST(HashTest, One) {
     //
     shard_t *shard = shard_init(tmpfile.c_str());
     ASSERT_NE(shard, nullptr);
-    ASSERT_GE(shard_create(shard, 1), 0);
+    ASSERT_GE(shard_prepare(shard, 1), 0);
     const char *keyA = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const char *objectA = "AAAAA";
     size_t objectA_size = strlen(objectA);
     ASSERT_GE(shard_object_write(shard, keyA, objectA, objectA_size), 0);
-    ASSERT_GE(shard_save(shard), 0);
+    ASSERT_GE(shard_finalize(shard), 0);
     size_t found_size = 0;
-    ASSERT_GE(shard_lookup_object_size(shard, keyA, &found_size), 0);
+    ASSERT_GE(shard_find_object(shard, keyA, &found_size), 0);
     ASSERT_EQ(objectA_size, found_size);
     char *found = (char *)malloc(found_size);
-    ASSERT_GE(shard_lookup_object(shard, found, found_size), 0);
+    ASSERT_GE(shard_read_object(shard, found, found_size), 0);
     ASSERT_EQ(memcmp((const void *)objectA, (const void *)found, found_size),
               0);
     free(found);
@@ -95,10 +95,10 @@ TEST(HashTest, One) {
     ASSERT_NE(shard, nullptr);
     ASSERT_GE(shard_load(shard), 0);
     found_size = 0;
-    ASSERT_GE(shard_lookup_object_size(shard, keyA, &found_size), 0);
+    ASSERT_GE(shard_find_object(shard, keyA, &found_size), 0);
     ASSERT_EQ(objectA_size, found_size);
     found = (char *)malloc(found_size);
-    ASSERT_GE(shard_lookup_object(shard, found, found_size), 0);
+    ASSERT_GE(shard_read_object(shard, found, found_size), 0);
     ASSERT_EQ(memcmp((const void *)objectA, (const void *)found, found_size),
               0);
     free(found);
@@ -127,7 +127,7 @@ TEST(HashTest, Many) {
     shard_t *shard = shard_init(tmpfile.c_str());
     ASSERT_NE(shard, nullptr);
     int objects_count = 10;
-    ASSERT_GE(shard_create(shard, objects_count), 0);
+    ASSERT_GE(shard_prepare(shard, objects_count), 0);
     for (int i = 0; i < objects_count; i++) {
         std::string key = gen_random(SHARD_KEY_LEN);
         std::string object = gen_random(rand(prng));
@@ -137,7 +137,7 @@ TEST(HashTest, Many) {
                                      object.length()),
                   0);
     }
-    ASSERT_GE(shard_save(shard), 0);
+    ASSERT_GE(shard_finalize(shard), 0);
     ASSERT_GE(shard_destroy(shard), 0);
 
     //
@@ -149,11 +149,10 @@ TEST(HashTest, Many) {
     ASSERT_GE(shard_load(shard), 0);
     for (std::pair<std::string, std::string> p : key2object) {
         size_t found_size = 0;
-        ASSERT_GE(shard_lookup_object_size(shard, p.first.c_str(), &found_size),
-                  0);
+        ASSERT_GE(shard_find_object(shard, p.first.c_str(), &found_size), 0);
         ASSERT_EQ(p.second.length(), found_size);
         char *found = (char *)malloc(found_size);
-        ASSERT_GE(shard_lookup_object(shard, found, found_size), 0);
+        ASSERT_GE(shard_read_object(shard, found, found_size), 0);
         ASSERT_EQ(memcmp((const void *)p.second.c_str(), (const void *)found,
                          found_size),
                   0);

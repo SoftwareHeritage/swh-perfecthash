@@ -274,9 +274,16 @@ int shard_hash_create(shard_t *shard) {
     shard->source = io_adapter(shard);
     shard->config = cmph_config_new(shard->source);
     cmph_config_set_algo(shard->config, CMPH_CHD_PH);
+    /* Set the load factor for the CHD algorithm to its maximum to waste the
+     * minimal amount of entries in the index. The resulting function should
+     * use 2.07 bits per objects.  */
+    cmph_config_set_graphsize(shard->config, 0.99);
     cmph_config_set_keys_per_bin(shard->config, 1);
     cmph_config_set_b(shard->config, 4);
     shard->hash = cmph_new(shard->config);
+    if (shard->hash == NULL) {
+        return -1;
+    }
     return 0;
 }
 
@@ -288,15 +295,16 @@ int shard_index_save(shard_t *shard) {
     assert(shard->header.index_position == shard_tell(shard));
     cmph_uint32 count = cmph_size(shard->hash);
     debug("shard_index_save: count = %d\n", count);
-    shard->header.index_size = count * sizeof(uint64_t);
-    uint64_t *index = (uint64_t *)calloc(1, shard->header.index_size);
+    shard->header.index_size = count * sizeof(shard_index_t);
+    shard_index_t *index = (shard_index_t *)calloc(1, shard->header.index_size);
     for (uint64_t i = 0; i < shard->index_offset; i++) {
         cmph_uint32 h =
             cmph_search(shard->hash, shard->index[i].key, SHARD_KEY_LEN);
         debug("shard_index_save: i = %ld, h = %d, offset = %ld\n", i, h,
               shard->index[i].object_offset);
         assert(h < count);
-        index[h] = htonq(shard->index[i].object_offset);
+        memcpy(index[h].key, shard->index[i].key, SHARD_KEY_LEN);
+        index[h].object_offset = htonq(shard->index[i].object_offset);
     }
     uint64_t index_size = shard->header.index_size;
     if (shard_write(shard, (void *)index, index_size) < 0) {
@@ -315,14 +323,43 @@ int shard_hash_save(shard_t *shard) {
     return 0;
 }
 
-int shard_save(shard_t *shard) {
+int shard_finalize(shard_t *shard) {
+    int ret = 0;
+
     shard->header.objects_size =
         shard_tell(shard) - shard->header.objects_position;
-    return (shard_hash_create(shard) < 0 || shard_index_save(shard) < 0 ||
-            shard_hash_save(shard) < 0 || shard_header_save(shard) < 0 ||
-            shard_magic_save(shard) < 0)
-               ? -1
-               : 0;
+
+    if ((ret = shard_hash_create(shard)) < 0) {
+        printf("shard_hash_create\n");
+        return ret;
+    }
+    if ((ret = shard_index_save(shard)) < 0) {
+        printf("shard_index_save\n");
+        return ret;
+    }
+    if ((ret = shard_hash_save(shard)) < 0) {
+        printf("shard_hash_save\n");
+        return ret;
+    }
+    if ((ret = shard_header_save(shard)) < 0) {
+        printf("shard_header_save\n");
+        return ret;
+    }
+    if ((ret = shard_magic_save(shard)) < 0) {
+        printf("shard_magic_save\n");
+        return ret;
+    }
+
+    if ((ret = fdatasync(fileno(shard->f))) < 0) {
+        if (errno == EINVAL || errno == EROFS) {
+            /* File(system) does not support fdatasync. Good luck! */
+            ret = 0;
+        } else {
+            printf("fdatasync: %s\n", strerror(errno));
+            return ret;
+        }
+    }
+    return ret;
 }
 
 int shard_reset(shard_t *shard) {
@@ -331,7 +368,7 @@ int shard_reset(shard_t *shard) {
     return shard_seek(shard, SHARD_OFFSET_HEADER, SEEK_SET);
 }
 
-int shard_create(shard_t *shard, uint64_t objects_count) {
+int shard_prepare(shard_t *shard, uint64_t objects_count) {
     if (shard_open(shard, "w+") < 0)
         return -1;
     if (shard_reset(shard) < 0)
@@ -346,38 +383,47 @@ int shard_create(shard_t *shard, uint64_t objects_count) {
  * Lookup objects from a Read Shard
  */
 
-int shard_lookup_object_size(shard_t *shard, const char *key,
-                             uint64_t *object_size) {
-    debug("shard_lookup_object_size\n");
+int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
+    debug("shard_find_object\n");
     cmph_uint32 h = cmph_search(shard->hash, key, SHARD_KEY_LEN);
-    debug("shard_lookup_object_size: h = %d\n", h);
-    uint64_t index_offset = shard->header.index_position + h * sizeof(uint64_t);
-    debug("shard_lookup_object_size: index_offset = %ld\n", index_offset);
+    debug("shard_find_object: h = %d\n", h);
+    uint64_t index_offset =
+        shard->header.index_position + h * sizeof(shard_index_t);
+    debug("shard_find_object: index_offset = %ld\n", index_offset);
     if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
-        printf("shard_lookup_object_size: index_offset\n");
+        printf("shard_find_object: index_offset\n");
+        return -1;
+    }
+    char object_id[SHARD_KEY_LEN];
+    if (shard_read(shard, object_id, SHARD_KEY_LEN) < 0) {
+        printf("shard_find_object: object_id\n");
+        return -1;
+    }
+    if (memcmp(key, object_id, SHARD_KEY_LEN) != 0) {
+        printf("shard_find_object: key mismatch");
         return -1;
     }
     uint64_t object_offset;
     if (shard_read_uint64_t(shard, &object_offset) < 0) {
-        printf("shard_lookup_object_size: object_offset\n");
+        printf("shard_find_object: object_offset\n");
         return -1;
     }
-    debug("shard_lookup_object_size: object_offset = %ld\n", object_offset);
+    debug("shard_find_object: object_offset = %ld\n", object_offset);
     if (shard_seek(shard, object_offset, SEEK_SET) < 0) {
-        printf("shard_lookup_object_size: object_offset\n");
+        printf("shard_find_object: object_offset\n");
         return -1;
     }
     if (shard_read_uint64_t(shard, object_size) < 0) {
-        printf("shard_lookup_object_size: object_size\n");
+        printf("shard_find_object: object_size\n");
         return -1;
     }
-    debug("shard_lookup_object_size: object_size = %ld\n", *object_size);
+    debug("shard_find_object: object_size = %ld\n", *object_size);
     return 0;
 }
 
-int shard_lookup_object(shard_t *shard, char *object, uint64_t object_size) {
+int shard_read_object(shard_t *shard, char *object, uint64_t object_size) {
     if (shard_read(shard, (void *)object, object_size) < 0) {
-        printf("shard_lookup_object: object\n");
+        printf("shard_read_object: object\n");
         return -1;
     }
     return 0;

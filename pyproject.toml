@@ -19,6 +19,9 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 [tool.setuptools.packages.find]
 include = ["swh.*"]
 
+[tool.setuptools.exclude-package-data]
+"swh.perfecthash" = [".clang-format"]
+
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt", "requirements-swh.txt"]}
 

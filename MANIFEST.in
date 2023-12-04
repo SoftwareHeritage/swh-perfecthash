@@ -1,6 +1,0 @@
-include Makefile
-include requirements*.txt
-include version.txt
-include README.rst
-recursive-include swh py.typed
-include swh/perfecthash/hash.[ch]

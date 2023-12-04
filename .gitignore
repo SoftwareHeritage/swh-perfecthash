@@ -1,23 +1,24 @@
 *.egg-info/
+*.o
 *.pyc
-*.sw?
-*~
+*.so
 .coverage
 .eggs/
+.hypothesis
 .mypy_cache
 .tox
 __pycache__
 build/
 dist/
-version.txt
-.mypy_cache/
-.vscode/
-*.o
-swh/perfecthash/test_hash
+# these are symlinks created by a hook in swh-docs' main sphinx conf.py
+docs/README.rst
+docs/README.md
+# this should be a symlink for people who want to build the sphinx doc
+# without using tox, generally created by the swh-env/bin/update script
+docs/Makefile.sphinx
+
+swh/perfecthash/html
 swh/perfecthash/hash.gcda
 swh/perfecthash/hash.gcno
+swh/perfecthash/test_hash
 swh/perfecthash/test_hash.lcov
-swh/perfecthash/html
-*.so
-/cmph/
-/wheelhouse/

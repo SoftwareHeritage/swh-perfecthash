@@ -1,6 +1,7 @@
 cffi
 
 [testing]
+cffi
 pytest
 pytest-mock
 types-cffi

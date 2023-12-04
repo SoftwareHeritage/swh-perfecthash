@@ -1,3 +1,4 @@
+.copier-answers.yml
 .git-blame-ignore-revs
 .gitignore
 .pre-commit-config.yaml
@@ -5,7 +6,6 @@ AUTHORS
 CODE_OF_CONDUCT.md
 CONTRIBUTORS
 LICENSE
-MANIFEST.in
 Makefile
 README.rst
 build_cmph.sh
@@ -27,7 +27,6 @@ docs/format.rst
 docs/index.rst
 docs/_static/.placeholder
 docs/_templates/.placeholder
-swh/__init__.py
 swh.perfecthash.egg-info/PKG-INFO
 swh.perfecthash.egg-info/SOURCES.txt
 swh.perfecthash.egg-info/dependency_links.txt

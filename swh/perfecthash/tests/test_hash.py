@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="function", autouse=True)
 def setrlimit(request):
-
     marker = request.node.get_closest_marker("setrlimit")
     rlimits = []
     if marker is not None:

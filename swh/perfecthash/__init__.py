@@ -209,6 +209,10 @@ class Shard:
 
         Returns:
            the object as bytes.
+
+        Raises:
+           KeyError: the object has been deleted
+           RuntimeError: something went wrong during lookup
         """
         assert self.shard, "Shard has been closed already"
 
@@ -218,7 +222,9 @@ class Shard:
         self.ffi.errno = 0
         object_size_pointer = self.ffi.new("uint64_t*")
         ret = lib.shard_find_object(self.shard, key, object_size_pointer)
-        if ret != 0:
+        if ret == 1:
+            raise KeyError(key)
+        elif ret < 0:
             errno = self.ffi.errno
             if errno == 0:
                 raise RuntimeError(
@@ -239,3 +245,27 @@ class Shard:
             else:
                 raise OSError(errno, os.strerror(errno), self.path)
         return cast(bytes, self.ffi.unpack(object_pointer, object_size))
+
+    @staticmethod
+    def delete(path: str, key: Key):
+        """Open the Shard file and delete the given key.
+
+        The object size and data will be overwritten by zeros. The Shard
+        file size and offsets are not changed for safety.
+
+        Args:
+            key: the key associated with the object to retrieve.
+
+        Raises:
+           KeyError: the object has been deleted
+           RuntimeError: something went wrong during lookup
+        """
+        with Shard(path) as shard:
+            shard._delete(key)
+
+    def _delete(self, key: Key):
+        ret = lib.shard_delete(self.shard, key)
+        if ret == 1:
+            raise KeyError(key)
+        elif ret < 0:
+            raise RuntimeError("shard_delete failed")

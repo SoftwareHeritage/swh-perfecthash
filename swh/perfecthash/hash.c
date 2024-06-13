@@ -369,13 +369,12 @@ int shard_finalize(shard_t *shard) {
         return ret;
     }
 
-    #ifdef __APPLE__
-        /* fdatasync is not advertised in headers on macOS, use fcntl instead */
-        ret = fcntl(fileno(shard->f), F_FULLFSYNC);
-    #else
-        ret = fdatasync(fileno(shard->f));
-    #endif
-
+#ifdef __APPLE__
+    /* fdatasync is not advertised in headers on macOS, use fcntl instead */
+    ret = fcntl(fileno(shard->f), F_FULLFSYNC);
+#else
+    ret = fdatasync(fileno(shard->f));
+#endif
 
     if (ret < 0) {
         if (errno == EINVAL || errno == EROFS) {

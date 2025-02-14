@@ -146,7 +146,7 @@ def corrupted_shard_path(tmpdir):
     with open(path, "rb+") as f:
         f.seek(SHARD_OFFSET_HEADER)
         # replace the object size (uint64_t) by something larger than file size
-        f.write(b"\x00\x00\x00\x00\x00\x00\xFF\xFF")
+        f.write(b"\x00\x00\x00\x00\x00\x00\xff\xff")
     return path
 
 

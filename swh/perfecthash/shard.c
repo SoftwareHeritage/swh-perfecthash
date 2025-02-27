@@ -17,7 +17,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "swh/perfecthash/hash.h"
+#include "swh/perfecthash/shard.h"
 
 const int shard_key_len = SHARD_KEY_LEN;
 

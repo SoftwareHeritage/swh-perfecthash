@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 extern "C" {
-#include "hash.h"
+#include "shard.h"
 }
 
 using namespace std::experimental;

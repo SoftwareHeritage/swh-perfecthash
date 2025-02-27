@@ -77,7 +77,7 @@ plugins = []
 # 3rd party libraries without stubs (yet)
 [[tool.mypy.overrides]]
 module = [
-    "swh.perfecthash._hash_cffi.*",
+    "swh.perfecthash._shard_cffi.*",
 ]
 ignore_missing_imports = true
 

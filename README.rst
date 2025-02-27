@@ -1,12 +1,17 @@
-Perfect Hash table for Software Heritage Object Storage
-=======================================================
+Shard File Format for the Software Heritage Object Storage
+==========================================================
 
-A perfect hash table for software heritage object storage.
+This module implement the support and tooling to manipulate SWH Shard files
+based on a perfect hash table, typically used by the software heritage object
+storage.
 
-Build dependencies
-------------------
+It is both a Python extension that can be used as a library to manuipulate SWH
+shard files, and a set of command line tools.
 
-This packages uses cffi to build the wrapper around the cmph minimal perfect
+Quick Start
+-----------
+
+This packages uses pybind11 to build the wrapper around the cmph minimal perfect
 hashmap library. To build the binary extension, in addition to the python
 development tools, you will need cmph, gtest and valgrind. On de Debian
 system, you can install these using:
@@ -15,8 +20,79 @@ system, you can install these using:
 
    sudo apt install build-essential python3-dev libcmph-dev libgtest-dev valgrind lcov
 
-Then you should be able to build the binary extension:
 
-.. code-block:: shell
+Command Line Tool
+~~~~~~~~~~~~~~~~~
 
-   python -m build
+You may use several methods to install swh-shard, e.g. using `uv`_ or `pip`_.
+
+For example:
+
+.. code-block:: console
+
+   $ uv tool install swh-shard
+   [...]
+   Installed 1 executable: swh-shard
+
+   $ swh-shard
+   Usage: swh-shard [OPTIONS] COMMAND [ARGS]...
+
+     Software Heritage Shard tools.
+
+   Options:
+     -C, --config-file FILE  Configuration file.
+     -h, --help              Show this message and exit.
+
+   Commands:
+     create  Create a shard file from given files
+     get     List objects in a shard file
+     info    Display shard file information
+     ls      List objects in a shard file
+
+Then you can create a shard file from local files:
+
+.. code-block:: console
+
+   $ swh-shard create volume.shard *.py
+   There are 3 entries
+   after deduplication: 3 entries
+   Done
+
+This will use the sha256 checksum of each file content given as argument as key
+in the shard file.
+
+Then you can check the header of the shard file:
+
+.. code-block:: console
+
+   $ swh-shard info volume.shard
+   Shard volume.shard
+   ├─version:    1
+   ├─objects:    3
+   │ ├─position: 512
+   │ └─size:     5633
+   ├─index
+   │ ├─position: 6145
+   │ └─size:     440
+   └─hash
+     └─position: 6585
+
+List the content of a shard:
+
+.. code-block:: console
+
+   $ swh-shard ls volume.shard
+   8bb71bce4885c526bb4114295f5b2b9a23a50e4a8d554c17418d1874b1a233ac: 834 bytes
+   06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f: 4210 bytes
+   d39790a3af51286d2d10d73e72e2447cf97b149ff2d8e275b200a1ee33e4a3c5: 565 bytes
+
+And retrieve an object from a shard:
+
+.. code-block:: console
+
+   $ swh-shard get volume.shard 06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f | sha256sum
+   06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f  -
+
+
+.. _`uv`: https://docs.astral.sh/uv/
+.. _`pip`: https://pip.pypa.io/

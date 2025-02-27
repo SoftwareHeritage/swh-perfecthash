@@ -37,7 +37,7 @@ repos:
       - id: mypy
         name: mypy
         entry: mypy
-        args: [swh]
+        args: ["-p", "swh.shard"]
         pass_filenames: false
         language: system
         types: [python]

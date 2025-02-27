@@ -1,3 +1,0 @@
-pytest >= 8.1
-pytest-mock
-types-cffi

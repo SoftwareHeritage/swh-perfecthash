@@ -17,8 +17,12 @@ docs/README.md
 # without using tox, generally created by the swh-env/bin/update script
 docs/Makefile.sphinx
 
-swh/shard/html
-swh/shard/shard.gcda
-swh/shard/shard.gcno
-swh/shard/test_shard
-swh/shard/test_shard.lcov
+src/_shard/html
+src/_shard/shard.gcda
+src/_shard/shard.gcno
+src/_shard/test_shard
+src/_shard/test_shard.lcov
+src/swh/shard/_version.py
+
+*.shard
+*.zst

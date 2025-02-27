@@ -60,7 +60,7 @@ std::string gen_random(const int len) {
     return tmp_s;
 }
 
-TEST(HashTest, One) {
+TEST(ShardTest, One) {
     auto tmpdir = create_temporary_directory();
     filesystem::path tmpfile = tmpdir / std::string("shard");
     ASSERT_GE(close(open(tmpfile.c_str(), O_CREAT, 0777)), 0);
@@ -107,7 +107,7 @@ TEST(HashTest, One) {
     filesystem::remove_all(tmpdir);
 }
 
-TEST(HashTest, Many) {
+TEST(ShardTest, Many) {
     auto tmpdir = create_temporary_directory();
     filesystem::path tmpfile = tmpdir / std::string("shard");
     ASSERT_GE(close(open(tmpfile.c_str(), O_CREAT, 0777)), 0);

@@ -1,9 +1,12 @@
 /*
- * Copyright (C) 2021-2022  The Software Heritage developers
+ * Copyright (C) 2021-2025  The Software Heritage developers
  * See the AUTHORS file at the top-level directory of this distribution
  * License: GNU General Public License version 3, or any later version
  * See top-level LICENSE file for more information
  */
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <assert.h>
 #include <errno.h>
@@ -17,7 +20,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "swh/shard/shard.h"
+#include "shard.h"
 
 const int shard_key_len = SHARD_KEY_LEN;
 
@@ -64,7 +67,7 @@ int shard_close(shard_t *shard) {
 
 int shard_seek(shard_t *shard, uint64_t offset, int whence) {
     if (offset > INT64_MAX) {
-        printf("shard_seek: %lu > %lu (INT64_MAX)", offset, INT64_MAX);
+        printf("shard_seek: %lu > %ld (INT64_MAX)", offset, INT64_MAX);
         return -1;
     }
     int r = fseeko(shard->f, offset, whence);
@@ -112,10 +115,10 @@ int shard_write(shard_t *shard, const void *ptr, uint64_t nmemb) {
 int shard_write_zeros(shard_t *shard, uint64_t size) {
 #define BUF_SIZE 4096
     char buf[BUF_SIZE];
-    size_t bytes_written;
 
     memset(buf, 0, BUF_SIZE);
     while (size > 0) {
+        size_t bytes_written;
         if ((bytes_written = fwrite(buf, 1, MIN(size, BUF_SIZE), shard->f)) ==
             0) {
             return -1;
@@ -244,6 +247,7 @@ int shard_header_reset(shard_header_t *header) {
 int shard_object_write(shard_t *shard, const char *key, const char *object,
                        uint64_t object_size) {
     // save key & index to later build the hash
+    debug("shard_object_write: index_offset=%lu\n", shard->index_offset);
     shard_index_t *index = &shard->index[shard->index_offset];
     memcpy((void *)index->key, key, SHARD_KEY_LEN);
     index->object_offset = shard_tell(shard);
@@ -335,11 +339,36 @@ int shard_index_save(shard_t *shard) {
         index[h].object_offset = htonq(shard->index[i].object_offset);
     }
     uint64_t index_size = shard->header.index_size;
+    debug("shard_index_save: save %lu index bytes at position %lu\n",
+          index_size, shard->header.index_position);
     if (shard_write(shard, (void *)index, index_size) < 0) {
         printf("shard_index_save\n");
         return -1;
     }
     free(index);
+    return 0;
+}
+
+int shard_index_get(shard_t *shard, uint64_t pos, shard_index_t *idx) {
+    // the number of entries in the cmph map (and thus in the index) is
+    // generally larger than the number of saved objects, but we do not keep
+    // the former number in the header, so recompute from the index size)
+    if (pos > shard->header.index_size / sizeof(shard_index_t)) {
+        printf("shard_index_get: position out of range\n");
+        return -1;
+    }
+    uint64_t index_offset =
+        shard->header.index_position + pos * sizeof(shard_index_t);
+    if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
+        printf("shard_index_get: index not found\n");
+    }
+    errno = 0;
+    if (shard_read(shard, idx, sizeof(shard_index_t)) < 0) {
+        printf("shard_index_get: index not found\n");
+        return -1;
+    }
+    idx->object_offset = ntohq(idx->object_offset);
+
     return 0;
 }
 
@@ -404,6 +433,7 @@ int shard_reset(shard_t *shard) {
 }
 
 int shard_prepare(shard_t *shard, uint64_t objects_count) {
+    debug("shard_prepare: objects=%lu\n", objects_count);
     if (shard_open(shard, "w+") < 0)
         return -1;
     if (shard_reset(shard) < 0)
@@ -486,12 +516,18 @@ int shard_hash_load(shard_t *shard) {
 
 int shard_load(shard_t *shard) {
     debug("shard_load\n");
-    if (shard_open(shard, "r") < 0)
+    if (shard_open(shard, "r") < 0) {
+        debug("Open failed\n");
         return -1;
-    if (shard_magic_load(shard) < 0)
+    }
+    if (shard_magic_load(shard) < 0) {
+        debug("Magic load failed\n");
         return -1;
-    if (shard_header_load(shard) < 0)
+    }
+    if (shard_header_load(shard) < 0) {
+        debug("Header load failed\n");
         return -1;
+    }
     return shard_hash_load(shard);
 }
 
@@ -618,3 +654,7 @@ int shard_destroy(shard_t *shard) {
     free(shard);
     return r;
 }
+
+#ifdef __cplusplus
+}
+#endif

@@ -12,8 +12,8 @@ Reference Documentation
 .. toctree::
    :maxdepth: 2
 
-   benchmarks
    format
+   benchmarks
 
 .. only:: standalone_package_doc
 

@@ -9,7 +9,7 @@ from typing import NewType, Optional, Type, cast
 
 from cffi import FFI
 
-from swh.perfecthash._shard_cffi import lib
+from swh.shard._shard_cffi import lib
 
 Key = NewType("Key", bytes)
 

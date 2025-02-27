@@ -7,5 +7,5 @@
 from setuptools import setup
 
 setup(
-    cffi_modules=["swh/perfecthash/build.py:ffibuilder"],
+    cffi_modules=["swh/shard/build.py:ffibuilder"],
 )

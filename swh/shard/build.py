@@ -55,11 +55,11 @@ elif platform.system() == "Darwin" and Path("/opt/local/include/cmph.h").is_file
 
 
 ffibuilder.set_source(
-    "swh.perfecthash._shard_cffi",
+    "swh.shard._shard_cffi",
     """
-    #include "swh/perfecthash/shard.h"
+    #include "swh/shard/shard.h"
     """,
-    sources=["swh/perfecthash/shard.c"],
+    sources=["swh/shard/shard.c"],
     include_dirs=["."],
     libraries=["cmph"],
     library_dirs=library_dirs,

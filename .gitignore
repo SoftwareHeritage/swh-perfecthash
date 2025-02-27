@@ -17,8 +17,8 @@ docs/README.md
 # without using tox, generally created by the swh-env/bin/update script
 docs/Makefile.sphinx
 
-swh/perfecthash/html
-swh/perfecthash/shard.gcda
-swh/perfecthash/shard.gcno
-swh/perfecthash/test_shard
-swh/perfecthash/test_shard.lcov
+swh/shard/html
+swh/shard/shard.gcda
+swh/shard/shard.gcno
+swh/shard/test_shard
+swh/shard/test_shard.lcov

@@ -1,10 +1,10 @@
 [project]
-name = "swh.perfecthash"
+name = "swh.shard"
 authors = [
     {name="Software Heritage developers", email="swh-devel@inria.fr"},
 ]
 
-description = "Software Heritage Perfect Hash"
+description = "Software Heritage Shard File Format"
 readme = {file = "README.rst", content-type = "text/x-rst"}
 requires-python = ">=3.7"
 classifiers = [
@@ -20,7 +20,7 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 include = ["swh.*"]
 
 [tool.setuptools.exclude-package-data]
-"swh.perfecthash" = [".clang-format"]
+"swh.shard" = [".clang-format"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt", "requirements-swh.txt"]}
@@ -29,11 +29,11 @@ dependencies = {file = ["requirements.txt", "requirements-swh.txt"]}
 testing = {file = ["requirements.txt", "requirements-swh.txt", "requirements-test.txt"]}
 
 [project.urls]
-"Homepage" = "https://gitlab.softwareheritage.org/swh/devel/swh-perfecthash"
-"Bug Reports" = "https://gitlab.softwareheritage.org/swh/devel/swh-perfecthash/-/issues"
+"Homepage" = "https://gitlab.softwareheritage.org/swh/devel/swh-shard"
+"Bug Reports" = "https://gitlab.softwareheritage.org/swh/devel/swh-shard/-/issues"
 "Funding" = "https://www.softwareheritage.org/donate"
-"Documentation" = "https://docs.softwareheritage.org/devel/swh-perfecthash/"
-"Source" = "https://gitlab.softwareheritage.org/swh/devel/swh-perfecthash.git"
+"Documentation" = "https://docs.softwareheritage.org/devel/swh-shard/"
+"Source" = "https://gitlab.softwareheritage.org/swh/devel/swh-shard.git"
 
 [build-system]
 requires = ["setuptools", "setuptools-scm", "cffi"]
@@ -77,7 +77,7 @@ plugins = []
 # 3rd party libraries without stubs (yet)
 [[tool.mypy.overrides]]
 module = [
-    "swh.perfecthash._shard_cffi.*",
+    "swh.shard._shard_cffi.*",
 ]
 ignore_missing_imports = true
 

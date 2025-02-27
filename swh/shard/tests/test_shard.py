@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from swh.perfecthash import Shard, ShardCreator
+from swh.shard import Shard, ShardCreator
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ def payload(request):
 
 #
 # PYTHONMALLOC=malloc valgrind --tool=memcheck .tox/py3/bin/pytest \
-#    -k test_build_speed swh/perfecthash/tests/test_hash.py |& tee /tmp/v
+#    -k test_build_speed swh/shard/tests/test_shard.py |& tee /tmp/v
 #
 def test_build_speed(request, tmpdir, payload):
     start = time.time()

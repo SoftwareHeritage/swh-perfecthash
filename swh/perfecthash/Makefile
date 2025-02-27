@@ -1,4 +1,5 @@
-CFLAGS=-D_FILE_OFFSET_BITS=64 -DHASH_DEBUG -Wall -I../.. -g -std=c++17 -fprofile-arcs -ftest-coverage
+CFLAGS=-D_FILE_OFFSET_BITS=64 -DHASH_DEBUG -Wall -I../.. -g -fprofile-arcs -ftest-coverage
+CXXFLAGS=$(CFLAGS) -std=c++17
 LDFLAGS=-lcmph -lgtest -lpthread -lstdc++ -lstdc++fs -fprofile-arcs -ftest-coverage
 
 test_hash: hash.o test_hash.o

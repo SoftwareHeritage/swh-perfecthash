@@ -313,9 +313,18 @@ int shard_index_save(shard_t *shard) {
           shard->header.index_position);
     assert(shard->header.index_position == shard_tell(shard));
     cmph_uint32 count = cmph_size(shard->hash);
+    // Note that the 'count' computed by cmph is generally bigger than the
+    // number of objects (in other word, it can be a NOT *minimal* perfect hash
+    // map)", so we have to initialize the table of index entries with explicit
+    // "invalid" entries (aka {key=0x00, offset=MAX_INT})
     debug("shard_index_save: count = %d\n", count);
     shard->header.index_size = count * sizeof(shard_index_t);
     shard_index_t *index = (shard_index_t *)calloc(1, shard->header.index_size);
+    // initialize all the index entries as "deleted" entries by default, the
+    // actual entries will be filled just below.
+    for (uint64_t i = 0; i < count; i++) {
+        index[i].object_offset = UINT64_MAX;
+    }
     for (uint64_t i = 0; i < shard->index_offset; i++) {
         cmph_uint32 h =
             cmph_search(shard->hash, shard->index[i].key, SHARD_KEY_LEN);

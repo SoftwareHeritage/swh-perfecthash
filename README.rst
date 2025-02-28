@@ -86,12 +86,23 @@ List the content of a shard:
    06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f: 4210 bytes
    d39790a3af51286d2d10d73e72e2447cf97b149ff2d8e275b200a1ee33e4a3c5: 565 bytes
 
-And retrieve an object from a shard:
+Retrieve an object from a shard:
 
 .. code-block:: console
 
    $ swh-shard get volume.shard 06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f | sha256sum
    06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f  -
+
+And delete one or more objects from a shard:
+
+.. code-block:: console
+
+   $ swh-shard delete volume.shard 06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f
+   About to remove these objects from the shard file misc/volume.shard
+   06340a7a5fa9e18d72a587a69e4dc7e79f4d6a56632ea6900c22575dc207b07f (4210 bytes)
+   Proceed? [y/N]: y
+   Deleting objects from the shard  [####################################]  100%
+   Done
 
 
 .. _`uv`: https://docs.astral.sh/uv/

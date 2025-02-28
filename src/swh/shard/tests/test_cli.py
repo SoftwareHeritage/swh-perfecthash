@@ -101,3 +101,115 @@ def test_cli_create(tmp_path):
         assert s.header.objects_count == 16
         # check stored sha256 digests are as expected
         assert sorted(list(s)) == sorted(hashes)
+
+
+def test_cli_delete_one_abort(small_shard):
+    runner = CliRunner()
+    key_num = 5
+    key = f"{key_num:-064X}"
+    result = runner.invoke(
+        cli.shard_delete,
+        [str(small_shard), key],
+        input="n\n",
+    )
+    assert result.exit_code == 1, result.output
+    assert "Proceed? [y/N]" in result.output
+    assert "Aborted!" in result.output
+
+    result = runner.invoke(cli.shard_get, [str(small_shard), key])
+    assert result.exit_code == 0
+    assert result.output == chr(65 + key_num) * 42
+
+
+def test_cli_delete_invalid_key_abort(small_shard):
+    runner = CliRunner()
+    keys = [f"{i:-064x}" for i in range(5)]
+    keys.append("00" * 16)
+    result = runner.invoke(
+        cli.shard_delete,
+        [str(small_shard), *keys],
+    )
+    assert result.exit_code == 1, result.output
+    assert "key is invalid" in result.output
+    assert "aborting" in result.output
+
+
+def test_cli_delete_unknown_key_abort(small_shard):
+    runner = CliRunner()
+    keys = [f"{i:-064x}" for i in range(5)]
+    keys.append("01" * 32)
+    result = runner.invoke(
+        cli.shard_delete,
+        [str(small_shard), *keys],
+    )
+    assert result.exit_code == 1, result.output
+    assert "key not found" in result.output
+    assert "aborting" in result.output
+
+
+@pytest.mark.parametrize("key_nums", [(5,), (1, 3, 5), tuple(range(16))])
+def test_cli_delete_confirm(small_shard, key_nums):
+    runner = CliRunner()
+    keys = [f"{key_num:-064x}" for key_num in key_nums]
+    result = runner.invoke(
+        cli.shard_delete,
+        [str(small_shard), *keys],
+        input="y\n",
+    )
+    assert result.exit_code == 0, result.output
+    assert "Proceed? [y/N]" in result.output
+    assert "Done" in result.output
+
+    result = runner.invoke(cli.shard_list, [str(small_shard)])
+    assert result.exit_code == 0
+    for i in range(16):
+        key = f"{i:-064x}"
+        if i in key_nums:
+            assert key not in result.output
+        else:
+            assert key in result.output
+
+
+@pytest.mark.parametrize("key_nums", [(5,), (1, 3, 5), tuple(range(16))])
+def test_cli_delete_from_stdin(small_shard, key_nums):
+    runner = CliRunner()
+    keys = [f"{key_num:-064x}" for key_num in key_nums]
+    result = runner.invoke(
+        cli.shard_delete,
+        [str(small_shard), "-"],
+        input="\n".join(keys),
+    )
+    assert result.exit_code == 0, result.output
+    assert "Proceed? [y/N]" not in result.output
+    assert "Done" in result.output
+
+    result = runner.invoke(cli.shard_list, [str(small_shard)])
+    assert result.exit_code == 0
+    for i in range(16):
+        key = f"{i:-064x}"
+        if i in key_nums:
+            assert key not in result.output
+        else:
+            assert key in result.output
+
+
+def test_cli_delete_one_no_confirm(small_shard):
+    runner = CliRunner()
+    key_num = 5
+    key = f"{key_num:-064x}"
+    result = runner.invoke(
+        cli.shard_delete,
+        ["--no-confirm", str(small_shard), key],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Proceed? [y/N]" not in result.output
+    assert "Done" in result.output
+
+    result = runner.invoke(cli.shard_list, [str(small_shard)])
+    assert result.exit_code == 0
+    for i in range(16):
+        key = f"{i:-064x}"
+        if i == key_num:
+            assert key not in result.output
+        else:
+            assert key in result.output

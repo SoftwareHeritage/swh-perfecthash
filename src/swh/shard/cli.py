@@ -132,6 +132,66 @@ def shard_get(ctx, shard, keys):
             click.echo(s[bytes.fromhex(key)], nl=False)
 
 
+@shard_cli_group.command("delete")
+@click.argument("shard", required=True)
+@click.argument("keys", required=True, nargs=-1)
+@click.option(
+    "--confirm/--no-confirm",
+    default=True,
+    help="Ask for confirmation before performing the deletion",
+)
+@click.pass_context
+def shard_delete(ctx, shard, keys, confirm):
+    """Delete objects from a shard file
+
+    Keys to delete from the shard file are expected to be given as hex
+    representation. If there is only one argument '-', then read the list of
+    keys from stdin. Implies --no-confirm.
+
+    If at least one key is missing or invalid, the whole process is aborted.
+
+    """
+    import sys
+
+    if keys == ("-",):
+        keys = sys.stdin.read().split()
+        confirm = False
+    if len(set(keys)) < len(keys):
+        click.fail("There are duplicate keys, aborting")
+
+    from swh.shard import Shard
+
+    obj_size = {}
+    with Shard(shard) as s:
+        for key in keys:
+            try:
+                obj_size[key] = s.getsize(bytes.fromhex(key))
+            except ValueError:
+                click.secho(f"{key}: key is invalid", fg="red")
+            except KeyError:
+                click.secho(f"{key}: key not found", fg="red")
+    if len(obj_size) < len(keys):
+        raise click.ClickException(
+            "There have been errors for at least one key, aborting"
+        )
+    click.echo(f"About to remove these objects from the shard file {shard}")
+    for key in keys:
+        click.echo(f"{key} ({obj_size[key]} bytes)")
+    if confirm:
+        click.confirm(
+            click.style(
+                "Proceed?",
+                fg="yellow",
+                bold=True,
+            ),
+            abort=True,
+        )
+    with click.progressbar(keys, label="Deleting objects from the shard") as barkeys:
+        for key in barkeys:
+            Shard.delete(shard, bytes.fromhex(key))
+    click.echo("Done")
+
+
 def main():
     # Even though swh() sets up logging, we need an earlier basic logging setup
     # for the next few logging statements

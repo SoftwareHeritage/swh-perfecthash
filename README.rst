@@ -55,7 +55,9 @@ Then you can create a shard file from local files:
 
    $ swh-shard create volume.shard *.py
    There are 3 entries
+   Checking files to add  [####################################]  100%
    after deduplication: 3 entries
+   Adding files to the shard  [####################################]  100%
    Done
 
 This will use the sha256 checksum of each file content given as argument as key

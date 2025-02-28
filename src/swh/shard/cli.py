@@ -91,24 +91,26 @@ def shard_create(ctx, shard, files, sort_files):
     click.echo(f"There are {len(files)} entries")
     hashes = set()
     files_to_add = {}
-    for fname in files:
-        try:
-            data = open(fname, "rb").read()
-        except OSError:
-            continue
-        sha256 = hashlib.sha256(data).digest()
-        if sha256 not in hashes:
-            files_to_add[fname] = sha256
-            hashes.add(sha256)
+    with click.progressbar(files, label="Checking files to add") as bfiles:
+        for fname in bfiles:
+            try:
+                data = open(fname, "rb").read()
+            except OSError:
+                continue
+            sha256 = hashlib.sha256(data).digest()
+            if sha256 not in hashes:
+                files_to_add[fname] = sha256
+                hashes.add(sha256)
     click.echo(f"after deduplication: {len(files_to_add)} entries")
 
     with ShardCreator(shard, len(files_to_add)) as shard:
         it = files_to_add.items()
         if sort_files:
             it = sorted(it, key=lambda x: x[0][-1::-1])
-        for fname, sha256 in it:
-            data = open(fname, "rb").read()
-            shard.write(sha256, data)
+        with click.progressbar(it, label="Adding files to the shard") as items:
+            for fname, sha256 in items:
+                data = open(fname, "rb").read()
+                shard.write(sha256, data)
     click.echo("Done")
 
 

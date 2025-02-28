@@ -6,7 +6,7 @@ authors = [
 
 description = "Software Heritage Shard File Format"
 readme = {file = "README.rst", content-type = "text/x-rst"}
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Intended Audience :: Developers",
@@ -103,3 +103,13 @@ consider_namespace_packages = true
 markers = [
     "setrlimit(*limits): Set resource limits for the current test",
 ]
+
+[tool.cibuildwheel]
+before-all = "yum install -y wget && ./build_cmph.sh"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-musllinux*"
+before-all = "apk add wget && ./build_cmph.sh"
+
+[tool.cibuildwheel.environment]
+LD_LIBRARY_PATH = "/project/cmph/lib"

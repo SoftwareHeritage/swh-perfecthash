@@ -7,6 +7,7 @@
 
 #include "shard.h"
 #include <errno.h>
+#include <limits.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
@@ -111,12 +112,20 @@ class ShardReader {
     py::bytes getitem(py::bytes key) {
         // get size and position file descriptor at the beginning of the object
         uint64_t size = getsize(key);
-        // TODO: get rid of this tmp malloc...
-        char *buf = new char[size];
+        if (size > (uint64_t)SSIZE_MAX) {
+            PyErr_SetString(PyExc_ValueError,
+                            "Object size overflows python bytes max size "
+                            "(are you still using a 32bits system?)");
+            throw py::error_already_set();
+        }
+        ssize_t bufsize = size;
+        // TODO: get rid of this tmp malloc... maybe return a buffer instead of
+        // a bytes would help...
+        char *buf = new char[bufsize];
         if (shard_read_object(this->shard, buf, size) != 0)
             throw std::runtime_error(
-                "content read failed. Shard file might be corrupted.");
-        py::bytes b = py::bytes(buf, size);
+                "Content read failed. Shard file might be corrupted.");
+        py::bytes b = py::bytes(buf, bufsize);
         delete buf;
         return b;
     }

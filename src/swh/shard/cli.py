@@ -32,7 +32,9 @@ def shard_cli_group(ctx):
 
 
 @shard_cli_group.command("info")
-@click.argument("shard", required=True, nargs=-1)
+@click.argument(
+    "shard", required=True, nargs=-1, type=click.Path(exists=True, dir_okay=False)
+)
 @click.pass_context
 def shard_info(ctx, shard):
     "Display shard file information"
@@ -55,7 +57,9 @@ def shard_info(ctx, shard):
 
 
 @shard_cli_group.command("create")
-@click.argument("shard", required=True)
+@click.argument(
+    "shard", required=True, type=click.Path(exists=False, dir_okay=False, writable=True)
+)
 @click.argument("files", metavar="files", required=True, nargs=-1)
 @click.option(
     "--sorted/--no-sorted",
@@ -72,9 +76,13 @@ def shard_create(ctx, shard, files, sort_files):
     "Create a shard file from given files"
 
     import hashlib
+    import os
     import sys
 
     from swh.shard import ShardCreator
+
+    if os.path.exists(shard):
+        raise click.ClickException(f"Shard file {shard} already exists. Aborted!")
 
     files = list(files)
     if files == ["-"]:
@@ -105,7 +113,7 @@ def shard_create(ctx, shard, files, sort_files):
 
 
 @shard_cli_group.command("ls")
-@click.argument("shard", required=True)
+@click.argument("shard", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.pass_context
 def shard_list(ctx, shard):
     "List objects in a shard file"
@@ -119,7 +127,7 @@ def shard_list(ctx, shard):
 
 
 @shard_cli_group.command("get")
-@click.argument("shard", required=True)
+@click.argument("shard", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.argument("keys", required=True, nargs=-1)
 @click.pass_context
 def shard_get(ctx, shard, keys):
@@ -133,7 +141,9 @@ def shard_get(ctx, shard, keys):
 
 
 @shard_cli_group.command("delete")
-@click.argument("shard", required=True)
+@click.argument(
+    "shard", required=True, type=click.Path(exists=True, dir_okay=False, writable=True)
+)
 @click.argument("keys", required=True, nargs=-1)
 @click.option(
     "--confirm/--no-confirm",

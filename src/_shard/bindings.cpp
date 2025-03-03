@@ -119,14 +119,14 @@ class ShardReader {
             throw py::error_already_set();
         }
         ssize_t bufsize = size;
-        // TODO: get rid of this tmp malloc... maybe return a buffer instead of
-        // a bytes would help...
-        char *buf = new char[bufsize];
+        // instantiate a py::bytes of required size
+        py::bytes b = py::bytes(NULL, bufsize);
+        // string_view.data() returns a const pointer, so enforce the cast to a
+        // char* (yep, that's not nice...)
+        char *buf = (char *)std::string_view(b).data();
         if (shard_read_object(this->shard, buf, size) != 0)
             throw std::runtime_error(
                 "Content read failed. Shard file might be corrupted.");
-        py::bytes b = py::bytes(buf, bufsize);
-        delete buf;
         return b;
     }
     void getindex(uint64_t pos, shard_index_t &idx) {

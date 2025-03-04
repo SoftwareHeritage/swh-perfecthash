@@ -11,6 +11,7 @@ extern "C" {
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <memory.h>
 #include <string.h>
@@ -67,13 +68,14 @@ int shard_close(shard_t *shard) {
 
 int shard_seek(shard_t *shard, uint64_t offset, int whence) {
     if (offset > INT64_MAX) {
-        printf("shard_seek: %lu > %ld (INT64_MAX)", offset, INT64_MAX);
+        printf("shard_seek: %" PRIu64 " > %" PRId64 " (INT64_MAX)", offset,
+               INT64_MAX);
         return -1;
     }
     int r = fseeko(shard->f, offset, whence);
     if (r < 0)
-        printf("shard_seek: fseeko(%p, %lu, %d): %s\n", shard->f, offset,
-               whence, strerror(errno));
+        printf("shard_seek: fseeko(%p, %" PRIu64 ", %d): %s\n", shard->f,
+               offset, whence, strerror(errno));
     return r;
 }
 
@@ -87,7 +89,8 @@ uint64_t shard_tell(shard_t *shard) {
 int shard_read(shard_t *shard, void *ptr, uint64_t size) {
     uint64_t read;
     if ((read = fread(ptr, 1, size, shard->f)) != size) {
-        printf("shard_read: read %lu instead of %lu\n", read, size);
+        printf("shard_read: read %" PRIu64 " instead of %" PRIu64 "\n", read,
+               size);
         return -1;
     }
     return 0;
@@ -106,7 +109,8 @@ int shard_read_uint64_t(shard_t *shard, uint64_t *ptr) {
 int shard_write(shard_t *shard, const void *ptr, uint64_t nmemb) {
     uint64_t wrote;
     if ((wrote = fwrite(ptr, 1, nmemb, shard->f)) != nmemb) {
-        printf("shard_write: wrote %lu instead of %lu\n", wrote, nmemb);
+        printf("shard_write: wrote %" PRIu64 " instead of %" PRIu64 "\n", wrote,
+               nmemb);
         return -1;
     }
     return 0;
@@ -168,7 +172,8 @@ int shard_magic_save(shard_t *shard) {
  */
 
 int shard_header_print(shard_header_t *header) {
-#define PRINT(name) debug("shard_header_print: " #name " %lu\n", header->name)
+#define PRINT(name)                                                            \
+    debug("shard_header_print: " #name " %" PRIu64 "\n", header->name)
     PRINT(version);
     PRINT(objects_count);
     PRINT(objects_position);
@@ -202,7 +207,8 @@ int shard_header_load(shard_t *shard) {
 #undef LOAD
     shard_header_print(&shard->header);
     if (shard->header.version != SHARD_VERSION) {
-        printf("shard_header_load: unexpected version, got %lu instead of %d\n",
+        printf("shard_header_load: unexpected version, got %" PRIu64
+               " instead of %d\n",
                shard->header.version, SHARD_VERSION);
         return -1;
     }
@@ -247,7 +253,8 @@ int shard_header_reset(shard_header_t *header) {
 int shard_object_write(shard_t *shard, const char *key, const char *object,
                        uint64_t object_size) {
     // save key & index to later build the hash
-    debug("shard_object_write: index_offset=%lu\n", shard->index_offset);
+    debug("shard_object_write: index_offset=%" PRIu64 "\n",
+          shard->index_offset);
     shard_index_t *index = &shard->index[shard->index_offset];
     memcpy((void *)index->key, key, SHARD_KEY_LEN);
     index->object_offset = shard_tell(shard);
@@ -313,7 +320,7 @@ int shard_hash_create(shard_t *shard) {
 int shard_index_save(shard_t *shard) {
     shard->header.index_position =
         shard->header.objects_position + shard->header.objects_size;
-    debug("shard_index_save: index_position %lu\n",
+    debug("shard_index_save: index_position %" PRIu64 "\n",
           shard->header.index_position);
     assert(shard->header.index_position == shard_tell(shard));
     cmph_uint32 count = cmph_size(shard->hash);
@@ -332,14 +339,16 @@ int shard_index_save(shard_t *shard) {
     for (uint64_t i = 0; i < shard->index_offset; i++) {
         cmph_uint32 h =
             cmph_search(shard->hash, shard->index[i].key, SHARD_KEY_LEN);
-        debug("shard_index_save: i = %lu, h = %d, offset = %lu\n", i, h,
-              shard->index[i].object_offset);
+        debug("shard_index_save: i = %" PRIu64 ", h = %d, offset = %" PRIu64
+              "\n",
+              i, h, shard->index[i].object_offset);
         assert(h < count);
         memcpy(index[h].key, shard->index[i].key, SHARD_KEY_LEN);
         index[h].object_offset = htonq(shard->index[i].object_offset);
     }
     uint64_t index_size = shard->header.index_size;
-    debug("shard_index_save: save %lu index bytes at position %lu\n",
+    debug("shard_index_save: save %" PRIu64 " index bytes at position %" PRIu64
+          "\n",
           index_size, shard->header.index_position);
     if (shard_write(shard, (void *)index, index_size) < 0) {
         printf("shard_index_save\n");
@@ -375,7 +384,8 @@ int shard_index_get(shard_t *shard, uint64_t pos, shard_index_t *idx) {
 int shard_hash_save(shard_t *shard) {
     shard->header.hash_position =
         shard->header.index_position + shard->header.index_size;
-    debug("shard_hash_save: hash_position %lu\n", shard->header.hash_position);
+    debug("shard_hash_save: hash_position %" PRIu64 "\n",
+          shard->header.hash_position);
     cmph_dump(shard->hash, shard->f);
     return 0;
 }
@@ -433,7 +443,7 @@ int shard_reset(shard_t *shard) {
 }
 
 int shard_prepare(shard_t *shard, uint64_t objects_count) {
-    debug("shard_prepare: objects=%lu\n", objects_count);
+    debug("shard_prepare: objects=%" PRIu64 "\n", objects_count);
     if (shard_open(shard, "w+") < 0)
         return -1;
     if (shard_reset(shard) < 0)
@@ -454,7 +464,7 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
     debug("shard_find_object: h = %d\n", h);
     uint64_t index_offset =
         shard->header.index_position + h * sizeof(shard_index_t);
-    debug("shard_find_object: index_offset = %lu\n", index_offset);
+    debug("shard_find_object: index_offset = %" PRIu64 "\n", index_offset);
     if (shard_seek(shard, index_offset, SEEK_SET) < 0) {
         printf("shard_find_object: index_offset\n");
         return -1;
@@ -469,7 +479,7 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
         printf("shard_find_object: object_offset\n");
         return -1;
     }
-    debug("shard_find_object: object_offset = %lu\n", object_offset);
+    debug("shard_find_object: object_offset = %" PRIu64 "\n", object_offset);
     /* Has the object been deleted? */
     if (object_offset == UINT64_MAX) {
         return 1;
@@ -488,7 +498,7 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
         printf("shard_find_object: object_size\n");
         return -1;
     }
-    debug("shard_find_object: object_size = %lu\n", *object_size);
+    debug("shard_find_object: object_size = %" PRIu64 "\n", *object_size);
     return 0;
 }
 
@@ -505,7 +515,8 @@ int shard_hash_load(shard_t *shard) {
         printf("shard_hash_load\n");
         return -1;
     }
-    debug("shard_hash_load: hash_position %lu\n", shard->header.hash_position);
+    debug("shard_hash_load: hash_position %" PRIu64 "\n",
+          shard->header.hash_position);
     shard->hash = cmph_load(shard->f);
     if (shard->hash == NULL) {
         printf("shard_hash_load: cmph_load\n");
@@ -594,7 +605,8 @@ int shard_delete(shard_t *shard, const char *key) {
         printf("shard_delete: object_size\n");
         return -1;
     }
-    debug("shard_delete: filling object size and data (len: %lu) with zeros\n",
+    debug("shard_delete: filling object size and data (len: %" PRIu64
+          ") with zeros\n",
           object_size);
     if (shard_seek(shard, object_offset, SEEK_SET) < 0) {
         printf("shard_delete: object_offset fill\n");

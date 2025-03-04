@@ -329,8 +329,13 @@ int shard_index_save(shard_t *shard) {
     // map)", so we have to initialize the table of index entries with explicit
     // "invalid" entries (aka {key=0x00, offset=MAX_INT})
     debug("shard_index_save: count = %d\n", count);
+    shard_index_t *index =
+        (shard_index_t *)calloc(count, sizeof(shard_index_t));
+    if (index == NULL) {
+        printf("shard_index_save: could not allocate memory for the index");
+        return -1;
+    }
     shard->header.index_size = count * sizeof(shard_index_t);
-    shard_index_t *index = (shard_index_t *)calloc(1, shard->header.index_size);
     // initialize all the index entries as "deleted" entries by default, the
     // actual entries will be filled just below.
     for (uint64_t i = 0; i < count; i++) {
@@ -443,7 +448,14 @@ int shard_reset(shard_t *shard) {
 }
 
 int shard_prepare(shard_t *shard, uint64_t objects_count) {
+    // this is used only when creating a new shard
     debug("shard_prepare: objects=%" PRIu64 "\n", objects_count);
+    if (objects_count > SHARD_MAX_OBJECTS) {
+        printf("shard_prepare: objects_count too big: %" PRIu64
+               " exceeds max value %" PRIu64,
+               objects_count, SHARD_MAX_OBJECTS);
+        return -1;
+    }
     if (shard_open(shard, "w+") < 0)
         return -1;
     if (shard_reset(shard) < 0)
@@ -451,6 +463,10 @@ int shard_prepare(shard_t *shard, uint64_t objects_count) {
     shard->header.objects_count = objects_count;
     shard->index =
         (shard_index_t *)malloc(sizeof(shard_index_t) * objects_count);
+    if (shard->index == NULL) {
+        printf("shard_prepare: cannot allocate memory for the index");
+        return -1;
+    }
     return 0;
 }
 

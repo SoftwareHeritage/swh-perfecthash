@@ -32,6 +32,7 @@ build-backend = "scikit_build_core.build"
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 wheel.exclude = ["*.c", "*.cpp", "*.h", ".clang-format", "*.o"]
+strict-config = false
 
 [tool.scikit-build.wheel.packages]
 "swh" = "src/swh"

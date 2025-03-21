@@ -6,12 +6,12 @@
 */
 
 #include "shard.h"
-#include <errno.h>
-#include <limits.h>
+#include <cerrno>
+#include <climits>
+#include <cstring>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
-#include <string.h>
 
 namespace py = pybind11;
 
@@ -24,21 +24,20 @@ class ShardCreator {
         this->shard = shard_init(path.c_str());
     }
     ~ShardCreator() { shard_destroy(this->shard); }
-    void write(py::bytes key, py::bytes object) {
+    void write(const py::bytes key, const py::bytes object) {
         if (n_registered >= n_entries) {
             throw py::value_error(
                 "The declared number of objects has already been written");
         }
-        std::string kbuf = std::string(key);
+        std::string_view kbuf = key;
         if (kbuf.size() != SHARD_KEY_LEN) {
             throw std::length_error(
                 "Invalid key size: "s + std::to_string(kbuf.size()) +
                 " (expected: " + std::to_string(SHARD_KEY_LEN) + ")");
         }
-        // Not sure whether this does a copy or not...
-        std::string sv = object;
+        std::string_view sv = object;
         errno = 0;
-        if (shard_object_write(this->shard, kbuf.c_str(), sv.c_str(),
+        if (shard_object_write(this->shard, kbuf.data(), sv.data(),
                                sv.size()) != 0) {
             PyErr_SetFromErrno(PyExc_OSError);
             throw py::error_already_set();
@@ -109,7 +108,7 @@ class ShardReader {
         int ret = shard_close(this->shard);
         return ret;
     }
-    py::bytes getitem(py::bytes key) {
+    py::bytes getitem(const py::bytes key) {
         // get size and position file descriptor at the beginning of the object
         uint64_t size = getsize(key);
         if (size > (uint64_t)SSIZE_MAX) {
@@ -142,7 +141,7 @@ class ShardReader {
             throw py::error_already_set();
         }
     }
-    uint64_t getsize(py::bytes key) {
+    uint64_t getsize(const py::bytes key) {
         std::string kbuf = std::string(key);
         if (kbuf.size() != SHARD_KEY_LEN) {
             throw std::length_error(
@@ -193,8 +192,8 @@ PYBIND11_MODULE(_shard, m) {
              })
         .def("getsize", &ShardReader::getsize)
         .def("delete",
-             [](const std::string &path, py::bytes key) {
-                 std::string kbuf = std::string(key);
+             [](const std::string &path, const py::bytes key) {
+                 std::string_view kbuf = key;
                  if (kbuf.size() != SHARD_KEY_LEN) {
                      throw std::length_error(
                          "Invalid key size: "s + std::to_string(kbuf.size()) +
@@ -204,8 +203,8 @@ PYBIND11_MODULE(_shard, m) {
                  shard_delete(reader.shard, kbuf.data());
              })
         .def("find",
-             [](ShardReader &s, py::bytes key) {
-                 std::string kbuf = std::string(key);
+             [](ShardReader &s, const py::bytes key) {
+                 std::string_view kbuf = key;
                  if (kbuf.size() != SHARD_KEY_LEN) {
                      throw std::length_error(
                          "Invalid key size: "s + std::to_string(kbuf.size()) +

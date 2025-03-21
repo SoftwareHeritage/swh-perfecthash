@@ -13,6 +13,9 @@ import click
 
 logger = logging.getLogger(__name__)
 
+# marker of a deleted/non-populated index entry
+NULLKEY = b"\x00" * 32
+
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 try:
@@ -115,16 +118,22 @@ def shard_create(ctx, shard, files, sort_files):
 
 
 @shard_cli_group.command("ls")
+@click.option("--skip-removed", default=False, is_flag=True)
 @click.argument("shard", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.pass_context
-def shard_list(ctx, shard):
+def shard_list(ctx, skip_removed, shard):
     "List objects in a shard file"
 
     from swh.shard import Shard
 
     with Shard(shard) as s:
         for key in s:
-            size = s.getsize(key)
+            if skip_removed and key == NULLKEY:
+                continue
+            try:
+                size = s.getsize(key)
+            except KeyError:
+                size = "N/A"
             click.echo(f"{key.hex()}: {size} bytes")
 
 

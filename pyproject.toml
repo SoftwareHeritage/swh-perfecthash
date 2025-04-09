@@ -33,6 +33,7 @@ build-backend = "scikit_build_core.build"
 minimum-version = "build-system.requires"
 wheel.exclude = ["*.c", "*.cpp", "*.h", ".clang-format", "*.o"]
 strict-config = false
+# build.verbose = true
 
 [tool.scikit-build.wheel.packages]
 "swh" = "src/swh"
@@ -104,13 +105,3 @@ consider_namespace_packages = true
 markers = [
     "setrlimit(*limits): Set resource limits for the current test",
 ]
-
-[tool.cibuildwheel]
-before-all = "yum install -y wget && ./build_cmph.sh"
-
-[[tool.cibuildwheel.overrides]]
-select = "*-musllinux*"
-before-all = "apk add wget && ./build_cmph.sh"
-
-[tool.cibuildwheel.environment]
-LD_LIBRARY_PATH = "/project/cmph/lib"

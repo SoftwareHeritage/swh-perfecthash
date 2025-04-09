@@ -320,13 +320,17 @@ def shard_build(request, tmpdir, payload):
 def test_memleak(request, tmpdir, payload):
     "Naive test for memleak in ShardReader"
     shard_build(request, tmpdir, payload)
-    maxrss0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     shard_file = str(tmpdir / "shard")
+    maxrss = [resource.getrusage(resource.RUSAGE_SELF).ru_maxrss]
     for i in range(100):
         with Shard(shard_file) as s:
             for key in s:
                 obj = s[key]
                 assert sha256(obj).digest() == key
-
-    maxrss1 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    assert (maxrss1 - maxrss0) < 1024  # in kB
+        maxrss.append(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    # on pypy, the used rss can still grow significantly during the first gew
+    # iterations, but should remain under a reasonable threshold
+    assert (maxrss[-1] - maxrss[1]) < 100 * 1024  # in kB
+    # but there should be none for the last iterations
+    for i in range(99, 90, -1):
+        assert (maxrss[i] - maxrss[i - 1]) == 0

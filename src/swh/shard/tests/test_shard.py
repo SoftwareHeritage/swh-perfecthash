@@ -7,6 +7,7 @@ from hashlib import sha256
 import logging
 import os
 from pathlib import Path
+import platform
 import random
 import resource
 import time
@@ -16,6 +17,9 @@ import pytest
 from swh.shard import Shard, ShardCreator
 
 logger = logging.getLogger(__name__)
+
+
+PYPY = platform.python_implementation() == "PyPy"
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -75,7 +79,8 @@ def test_creator_open_without_permission(tmpdir):
     path.touch()
     # Remove all permissions
     path.chmod(0o000)
-    with pytest.raises(PermissionError):
+    exc_cls = RuntimeError if PYPY else PermissionError
+    with pytest.raises(exc_cls):
         with ShardCreator(str(path), 1):
             pass
 
@@ -135,7 +140,8 @@ def test_creator_errors_with_duplicate_key(tmpdir):
 
 
 def test_load_non_existing():
-    with pytest.raises(FileNotFoundError):
+    exc_cls = RuntimeError if PYPY else FileNotFoundError
+    with pytest.raises(exc_cls):
         _ = Shard("/nonexistent")
 
 
@@ -239,7 +245,8 @@ def test_build_speed(request, tmpdir, payload):
     # regress in the future... (we use x10 to give a bit of slack otherwise the
     # test is pretty unstable)
     #
-    assert duration < baseline * 10
+    k = 100 if PYPY else 10
+    assert duration < baseline * k
 
 
 def test_lookup_speed(request, tmpdir, payload):
@@ -333,4 +340,4 @@ def test_memleak(request, tmpdir, payload):
     assert (maxrss[-1] - maxrss[1]) < 100 * 1024  # in kB
     # but there should be none for the last iterations
     for i in range(99, 90, -1):
-        assert (maxrss[i] - maxrss[i - 1]) == 0
+        assert (maxrss[i] - maxrss[i - 1]) == 0, maxrss[i] - maxrss[i - 1]

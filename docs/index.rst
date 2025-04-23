@@ -1,4 +1,4 @@
-.. _swh-perfecthash:
+.. _swh-shard:
 
 .. include:: README.rst
 

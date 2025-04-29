@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import gc
 from hashlib import sha256
 import logging
 import os
@@ -330,6 +331,9 @@ def test_memleak(request, tmpdir, payload):
     shard_file = str(tmpdir / "shard")
     maxrss = [resource.getrusage(resource.RUSAGE_SELF).ru_maxrss]
     for i in range(100):
+        # run the garbage collector first to avoid the memory of one iteration
+        # to affect the next one
+        gc.collect()
         with Shard(shard_file) as s:
             for key in s:
                 obj = s[key]

@@ -6,7 +6,7 @@
 .eggs/
 .hypothesis
 .mypy_cache
-.tox
+.tox*
 __pycache__
 build/
 dist/

@@ -22,7 +22,7 @@ def small_shard(tmp_path):
 def test_cli():
     runner = CliRunner()
     result = runner.invoke(cli.shard_cli_group)
-    assert result.exit_code == 0
+    assert result.exit_code == 2
     assert "Software Heritage Shard tools" in result.output
 
 

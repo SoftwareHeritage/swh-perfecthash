@@ -107,3 +107,6 @@ consider_namespace_packages = true
 markers = [
     "setrlimit(*limits): Set resource limits for the current test",
 ]
+
+[tool.cibuildwheel]
+enable = ["pypy"]

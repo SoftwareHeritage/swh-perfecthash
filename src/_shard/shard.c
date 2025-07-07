@@ -503,7 +503,7 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size) {
     /* We compare the key after the offset so we have a way to
      * detect removed objects. */
     if (memcmp(key, object_id, SHARD_KEY_LEN) != 0) {
-        printf("shard_find_object: key mismatch");
+        printf("shard_find_object: key mismatch\n");
         return -1;
     }
     if (shard_seek(shard, object_offset, SEEK_SET) < 0) {
@@ -609,7 +609,7 @@ int shard_delete(shard_t *shard, const char *key) {
     /* We compare the key after the offset so we have a way to
      * detect removed objects. */
     if (memcmp(key, object_id, SHARD_KEY_LEN) != 0) {
-        printf("shard_delete: key mismatch");
+        printf("shard_delete: key mismatch\n");
         return -1;
     }
     debug("shard_delete: reading object size\n");

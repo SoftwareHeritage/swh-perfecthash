@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 from hashlib import sha256
+import struct
 
 from click.testing import CliRunner
 import pytest
@@ -17,6 +18,98 @@ def small_shard(tmp_path):
         for i in range(16):
             shard.write(bytes.fromhex(f"{i:-064X}"), bytes((65 + i,)) * 42)
     return tmp_path / "small.shard"
+
+
+@pytest.fixture
+def valid_shard(tmp_path):
+    with ShardCreator(str(tmp_path / "valid.shard"), 16) as shard:
+        for i in range(16):
+            data = bytes((65 + i,)) * 11 * (i + 1)
+            key = sha256(data).digest()
+            shard.write(key, data)
+    return tmp_path / "valid.shard"
+
+
+@pytest.fixture
+def corrupted_shard_hash(tmp_path):
+    """create a corrupted shard file
+
+    It's coming with:
+    - at index 5: a corrupted data (hash of the content does not match the key)
+    """
+    fname = tmp_path / "corrupted_hash.shard"
+    objid = 5
+    with ShardCreator(str(fname), 16) as shard:
+        for i in range(16):
+            data = bytes((65 + i,)) * 11 * (i + 1)
+            key = sha256(data).digest()
+            if i == objid:
+                # bitflip: same size, only one bit altered
+                data = data[:-1] + (data[-1] ^ 1).to_bytes()
+                altered_key = key
+            shard.write(key, data)
+
+    return fname, objid, altered_key
+
+
+@pytest.fixture
+def corrupted_shard_size(tmp_path):
+    """create a corrupted shard file
+
+    It's coming with:
+    - at index 7: an invalid object size
+    """
+    fname = tmp_path / "corrupted_size.shard"
+    objid = 7
+    with ShardCreator(str(fname), 16) as shard:
+        for i in range(16):
+            data = bytes((65 + i,)) * 11 * (i + 1)
+            key = sha256(data).digest()
+            shard.write(key, data)
+    # change the size of object at index 7
+    with Shard(str(fname)) as s:
+        idx = s.getindex(objid)
+        key = idx.key
+        offset = idx.object_offset
+    with open(fname, "r+b") as shardfile:
+        shardfile.seek(offset)
+        size = struct.unpack(">Q", shardfile.read(8))[0]
+        newsize = struct.pack(">Q", size + 1)
+        shardfile.seek(-8, 1)
+        shardfile.write(newsize)
+
+    return fname, objid, key
+
+
+@pytest.fixture
+def corrupted_shard_offset(tmp_path):
+    """create a corrupted shard file
+
+    It's coming with:
+    - at index 3: an invalid offset
+    """
+    fname = tmp_path / "corrupted_offset.shard"
+    objid = 3
+    with ShardCreator(str(fname), 16) as shard:
+        for i in range(16):
+            data = bytes((65 + i,)) * 11 * (i + 1)
+            key = sha256(data).digest()
+            shard.write(key, data)
+
+    # change the offset of object at index 3. For this, use the offset of
+    # another existing object (here obj5) so the file is not completely
+    # garbage...
+    with Shard(str(fname)) as s:
+        key = s.getindex(objid).key
+        use_offset = s.getindex((objid + 2) % 16).object_offset
+        idx_pos = s.header.index_position
+
+    with open(fname, "r+b") as shardfile:
+        # set the fp at beginning of the offset for object number 3
+        shardfile.seek(idx_pos + 40 * objid + 32)
+        shardfile.write(struct.pack(">Q", use_offset))
+
+    return fname, objid, key
 
 
 def test_cli():
@@ -210,3 +303,53 @@ def test_cli_delete_one_no_confirm(small_shard):
             assert key not in result.output
         else:
             assert key in result.output
+
+
+@pytest.mark.parametrize("with_hash", [False, True])
+def test_cli_check_ok(valid_shard, with_hash):
+    runner = CliRunner()
+    args = []
+    if with_hash:
+        args.append("--with-hash")
+    args.append(str(valid_shard))
+    result = runner.invoke(cli.shard_check, args)
+    assert result.exit_code == 0, result.output
+
+
+def test_cli_check_corrupted_ok_no_hash(corrupted_shard_hash):
+    shardfile, objid, key = corrupted_shard_hash
+    runner = CliRunner()
+    args = [str(shardfile)]
+    result = runner.invoke(cli.shard_check, args)
+    assert result.exit_code == 0, result.output
+
+
+def test_cli_check_corrupted_ko_hash(corrupted_shard_hash):
+    shardfile, objid, key = corrupted_shard_hash
+    runner = CliRunner()
+    args = ["--with-hash", str(shardfile)]
+    result = runner.invoke(cli.shard_check, args)
+    assert result.exit_code != 0, result.output
+    assert f"{key.hex()}: hash mismatch" in result.output
+
+
+def test_cli_check_corrupted_ko_size(corrupted_shard_size):
+    shardfile, objid, key = corrupted_shard_size
+    runner = CliRunner()
+    args = [str(shardfile)]
+    result = runner.invoke(cli.shard_check, args)
+    assert result.exit_code != 0, result.output
+    assert "Total size mismatch" in result.output
+    assert "Offset lists mismatch" in result.output
+
+
+def test_cli_check_corrupted_ko_offset(corrupted_shard_offset):
+    shardfile, objid, key = corrupted_shard_offset
+    runner = CliRunner()
+    args = ["--with-hash", str(shardfile)]
+    result = runner.invoke(cli.shard_check, args)
+    assert result.exit_code != 0, result.output
+    assert "Offset lists mismatch" in result.output
+    # object with invalid offset in the index should generate an invalid hash
+    # error as well
+    assert f"{key.hex()}: hash mismatch" in result.output

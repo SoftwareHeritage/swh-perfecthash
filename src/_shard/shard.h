@@ -52,8 +52,9 @@ extern const int shard_key_len;
    |   hash function        |      | <as written by cmph_dump>  |
    +------------------------+------+----------------------------+
 
-   Note: objects are generally not listed in the same order in the *objects*
-   section and the *Index* one.
+   Note: objects are not listed in the same order in the *Objects* section and
+   the *Index* one. Objects are stored in insertion order, while the index is
+   in the order that is most efficient for the cmph function.
  */
 
 typedef struct {

@@ -178,7 +178,7 @@ def shard_delete(ctx, shard, keys, confirm):
         keys = sys.stdin.read().split()
         confirm = False
     if len(set(keys)) < len(keys):
-        click.fail("There are duplicate keys, aborting")
+        ctx.fail("There are duplicate keys, aborting")
 
     from swh.shard import Shard
 
@@ -211,6 +211,112 @@ def shard_delete(ctx, shard, keys, confirm):
         for key in barkeys:
             Shard.delete(shard, bytes.fromhex(key))
     click.echo("Done")
+
+
+@shard_cli_group.command("check")
+@click.argument(
+    "shard", required=True, nargs=-1, type=click.Path(exists=True, dir_okay=False)
+)
+@click.option(
+    "--with-hash", is_flag=True, default=False, help="Also check objects hashes (slow!)"
+)
+@click.pass_context
+def shard_check(ctx, shard, with_hash):
+    "Check a shard file for data corruption or inconsistencies"
+
+    import hashlib
+    import struct
+
+    from swh.shard import Shard
+
+    errors = []
+    sizes = []
+    for shardfile in shard:
+        with Shard(shardfile) as s:
+            h = s.header
+            n_entries = h.index_size // 40  # 32 + 8
+            idx = h.index_position
+            obj_pos = h.objects_position
+            logger.debug("IDX=%s", idx)
+            logger.debug("OBJS=%s", obj_pos)
+            logger.debug("ENTRIES=%s", n_entries)
+
+            # for most of the checks we only use direct access to the file,
+            # without using the C extension _shard, but for checking the
+            # hashmap; so we have the shard file open twice here: one as a
+            # regular python (binary) file object, and one via the Shard object
+            # encapsulating the C extension.
+            with open(shardfile, "rb") as fob:
+                # build the list of object offsets as built in the *objects*
+                # section of the shard file
+                obj_offsets = []
+                fob.seek(h.objects_position)
+                with click.progressbar(
+                    length=h.objects_size, label="listing objects"
+                ) as bar:
+                    while True:
+                        obj_offsets.append(fob.tell())
+                        size = struct.unpack(">Q", fob.read(8))[0]
+                        sizes.append(size)
+                        fob.seek(size, 1)
+                        bar.update(8 + size)
+                        if (fob.tell() - h.objects_position) >= h.objects_size:
+                            break
+                # build the list of object offsets as defined in the *Index*
+                # section of the shard file. If asked for, also check each object's
+                # sha256 sum while iterating on the index entries.
+                idx_offsets = []
+                fob.seek(h.index_position)
+                with click.progressbar(
+                    length=h.index_size, label="listing indexes"
+                ) as bar:
+                    while True:
+                        key = fob.read(32)
+                        offset = fob.read(8)
+                        if key != NULLKEY:
+                            idx_offsets.append(struct.unpack(">Q", offset)[0])
+                            pos = fob.tell()
+                            fob.seek(idx_offsets[-1])
+                            size = struct.unpack(">Q", fob.read(8))[0]
+                            try:
+                                # calling Shard.getsize() will use the hashmap,
+                                # thus checking it's OK for the key
+                                s.getsize(key)
+                            except Exception as exc:
+                                errors.append(
+                                    f"{key.hex()}: Shard.getsize() error ({exc})"
+                                )
+                            if with_hash:
+                                content_hash = hashlib.sha256(fob.read(size)).digest()
+                                if content_hash != key:
+                                    errors.append(
+                                        f"{key.hex()}: hash mismatch (computed: {content_hash.hex()})"  # noqa
+                                    )
+                            fob.seek(pos)
+                        # next position (key (32) + offset (8))
+                        bar.update(40)
+                        if (fob.tell() - h.index_position) >= h.index_size:
+                            break
+        # compare the 2 offset lists; once sorted, they should match exactly
+        if len(idx_offsets) != len(obj_offsets):
+            errors.append(
+                f"Offset lists len mismatch: {len(idx_offsets)} vs. {len(obj_offsets)}"
+            )
+        if sorted(idx_offsets) != obj_offsets:
+            errors.append("Offset lists mismatch")
+
+    if (sum(sizes) + h.objects_count * 8) != h.objects_size:
+        errors.append(
+            f"Total size mismatch: {sum(sizes)} + ({h.objects_count} * 8) computed "
+            f"vs. {h.objects_size} advertised"
+        )
+    if errors:
+        click.echo(
+            "check failed with the following error(s):\n"
+            + "\n".join(f"- {err}" for err in errors),
+            err=True,
+        )
+        ctx.exit(1)
 
 
 def main():

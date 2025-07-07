@@ -27,20 +27,20 @@ extern const int shard_key_len;
    +------------------------+------+----------------------------+
    | SHARD_MAGIC            | 0    | SHARD_OFFSET_MAGIC (32)    |
    +------------------------+------+----------------------------+
-   | *header*               | 32   | (56)                       |
-   |   version              |      | uint64_t (8)               |
-   |   objects_count        |      | uint64_t (8)               |
-   |   objects_position (op)|      | uint64_t (8)               |
-   |   objects_size         |      | uint64_t (8)               |
-   |   index_position (ip)  |      | uint64_t (8)               |
-   |   index_size           |      | uint64_t (8)               |
-   |   hash_position (hp)   |      | uint64_t (8)               |
+   | *header*               |      | (56)                       |
+   |   version              | 32   | uint64_t (8)               |
+   |   objects_count        | 40   | uint64_t (8)               |
+   |   objects_position (op)| 48   | uint64_t (8)               |
+   |   objects_size         | 56   | uint64_t (8)               |
+   |   index_position (ip)  | 64   | uint64_t (8)               |
+   |   index_size           | 72   | uint64_t (8)               |
+   |   hash_position (hp)   | 80   | uint64_t (8)               |
    +------------------------+------+----------------------------+
    | *Objects*              | <op> |                            |
-   |   object0 size         |      | uint64_t (8)               |
-   |   object0 data         |      | <object0 size>             |
-   |   object1 size         |      | uint64_t (8)               |
-   |   object1 data         |      | <object1 size>             |
+   |   objectx size         |      | uint64_t (8)               |
+   |   objectx data         |      | <object0 size>             |
+   |   objecty size         |      | uint64_t (8)               |
+   |   objecty data         |      | <object1 size>             |
    |   ...                  |      |                            |
    +------------------------+------+----------------------------+
    | *Index*                | <ip> |                            |
@@ -52,6 +52,8 @@ extern const int shard_key_len;
    |   hash function        |      | <as written by cmph_dump>  |
    +------------------------+------+----------------------------+
 
+   Note: objects are generally not listed in the same order in the *objects*
+   section and the *Index* one.
  */
 
 typedef struct {

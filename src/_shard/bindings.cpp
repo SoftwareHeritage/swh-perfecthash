@@ -169,7 +169,17 @@ class ShardReader {
 
 PYBIND11_MODULE(_shard, m) {
     py::class_<ShardCreator>(m, "ShardCreator")
-        .def(py::init<const std::string &, uint64_t>())
+        .def(py::init<const std::string &, uint64_t>(),
+             "Instantiate a ShardCreator object\n\n"
+             "Arguments:\n"
+             "  path: the filename of the shard file to create\n"
+             "  n: number of objects the shard file will store\n"
+             "\n"
+             "Typical usage will be:\n\n"
+             "  with ShardCreate('my.shard', 10) as shard:\n"
+             "      for i in range(10):\n"
+             "          shard.write(key_i, content_i)\n\n",
+             py::arg("path"), py::arg("n"))
         .def_property_readonly("header",
                                [](ShardCreator &s) -> const shard_header_t & {
                                    return s.shard->header;
@@ -183,66 +193,156 @@ PYBIND11_MODULE(_shard, m) {
                  if (!exc_type)
                      s.exit();
              })
-        .def("write", &ShardCreator::write)
-        .def("key_len", [](ShardCreator &s) { return SHARD_KEY_LEN; });
+        .def("write", &ShardCreator::write,
+             "Write a new object in the shard file identified by given key",
+             py::arg("key"), py::arg("object"))
+        .def_property_readonly_static(
+            "key_len", [](py::object) { return SHARD_KEY_LEN; },
+            "Size of the keys (in bytes)")
+        .doc() = "A shard file creator helper class";
 
     py::class_<ShardReader>(m, "ShardReader")
         .def_property_readonly_static(
-            "key_len", [](py::object /* self */) { return SHARD_KEY_LEN; })
-        .def(py::init<const std::string &>())
-        .def("close", &ShardReader::close)
+            "key_len", [](py::object /* self */) { return SHARD_KEY_LEN; },
+            "Size of the key (in bytes)")
+        .def(py::init<const std::string &>(),
+             "Instantiate a ShardReader object\n\n"
+             "Arguments:\n"
+             "  path: the filename of the shard to read\n"
+             "\n",
+             py::arg("path"))
+        .def("close", &ShardReader::close,
+             "Close the shard\n\n"
+             "Unload the shard index and CMPH data structure and close the "
+             "file\n")
+
         .def_property_readonly("header",
                                [](ShardReader &s) -> const shard_header_t & {
                                    return s.shard->header;
                                })
-        .def("getindex",
-             [](ShardReader &s, uint64_t pos) -> shard_index_t {
-                 shard_index_t idx;
-                 s.getindex(pos, idx);
-                 return idx;
-             })
-        .def("getsize", &ShardReader::getsize)
-        .def("getpos", &ShardReader::getpos)
-        .def("delete",
-             [](const std::string &path, const py::bytes key) {
-                 std::string_view kbuf = key;
-                 if (kbuf.size() != SHARD_KEY_LEN) {
-                     throw std::length_error(
-                         "Invalid key size: "s + std::to_string(kbuf.size()) +
-                         " (expected: " + std::to_string(SHARD_KEY_LEN) + ")");
-                 }
-                 ShardReader reader(path);
-                 shard_delete(reader.shard, kbuf.data());
-             })
-        .def("find",
-             [](ShardReader &s, const py::bytes key) {
-                 std::string_view kbuf = key;
-                 if (kbuf.size() != SHARD_KEY_LEN) {
-                     throw std::length_error(
-                         "Invalid key size: "s + std::to_string(kbuf.size()) +
-                         " (expected: " + std::to_string(SHARD_KEY_LEN) + ")");
-                 }
-                 uint64_t size;
-                 if (shard_find_object(s.shard, kbuf.data(), &size) != 0)
-                     throw py::key_error("key not found");
-                 return size;
-             })
-        .def("__getitem__", &ShardReader::getitem)
-        .def("lookup", &ShardReader::getitem);
+        .def(
+            "getindex",
+            [](ShardReader &s, uint64_t pos) -> shard_index_t {
+                shard_index_t idx;
+                s.getindex(pos, idx);
+                return idx;
+            },
+            "Get the index at position pos\n\n"
+            "Arguments:\n"
+            "  pos: the position (in the index structure) of the index entry "
+            "to retrieve\n\n"
+            "The returned index structure may have a NULL key (0x000000...00) "
+            "if there is no stored object for the index entry at given "
+            "position\n\n",
+            py::arg("pos"))
+        .def("getsize", &ShardReader::getsize,
+             "Get the size of the object from the given key\n\n"
+             "Arguments:\n"
+             "  key: the key of the object to look for\n"
+             "\n"
+             "If the key is not found in the shard file, throw a KeyError "
+             "exception.\n",
+             py::arg("key"))
+        .def("getpos", &ShardReader::getpos,
+             "Get the index position for the given key\n\n"
+             "Arguments:\n"
+             "  key: the key of the object to look for\n"
+             "\n"
+             "If the key is not found in the shard file, throw a KeyError "
+             "exception.\n",
+             py::arg("key"))
+        .def_static(
+            "delete",
+            [](const std::string &path, const py::bytes key) {
+                std::string_view kbuf = key;
+                if (kbuf.size() != SHARD_KEY_LEN) {
+                    throw std::length_error(
+                        "Invalid key size: "s + std::to_string(kbuf.size()) +
+                        " (expected: " + std::to_string(SHARD_KEY_LEN) + ")");
+                }
+                ShardReader reader(path);
+                shard_delete(reader.shard, kbuf.data());
+            },
+            "Remove an entry from the given shard file\n\n"
+            "Arguments:\n"
+            "  path: the filename of the shard to read\n"
+            "  key: the key of the object to delete\n"
+            "\n"
+            "If the key is not found in the shard file, throw a KeyError "
+            "exception.\n\n"
+            "Note: this is a static method:\n\n"
+            "  ShardReader.delete(shard_filename, key)\n"
+            "\n",
+            py::arg("path"), py::arg("key"))
+        .def(
+            "find",
+            [](ShardReader &s, const py::bytes key) {
+                std::string_view kbuf = key;
+                if (kbuf.size() != SHARD_KEY_LEN) {
+                    throw std::length_error(
+                        "Invalid key size: "s + std::to_string(kbuf.size()) +
+                        " (expected: " + std::to_string(SHARD_KEY_LEN) + ")");
+                }
+                uint64_t size;
+                if (shard_find_object(s.shard, kbuf.data(), &size) != 0)
+                    throw py::key_error("key not found");
+                return size;
+            },
+            "Look for an object in the shard file from its key\n\n"
+            "Arguments:\n"
+            "  key: the key to look for\n"
+            "Returns:\n"
+            "  the size of the object if found\n"
+            "\n",
+            py::arg("key"))
+        .def("__getitem__", &ShardReader::getitem, "See .lookup()\n")
+        .def("lookup", &ShardReader::getitem,
+             "Return the object from the shard file at given key\n\n"
+             "Arguments:\n"
+             "  key: the key of the object to look for\n"
+             "Returns:\n"
+             "  the object content as a bytes\n"
+             "Raises:\n"
+             "  KeyError: if the key is not found in the shard file\n"
+             "  ValueError: if the object size is too big\n"
+             "  RuntimeError: if the content could not be read (IO error)\n"
+             "\n",
+             py::arg("key"))
+        .doc() =
+        ("A shard file reader helper class\n\n"
+         "This allows to easily read a shord file, get information (header) "
+         "and extract objects from the shard file. Also provides a static "
+         "method "
+         "allowing to modify a shard file to delete an object.");
 
     py::class_<shard_header_t>(m, "ShardHeader")
-        .def_readonly("version", &shard_header_t::version)
-        .def_readonly("objects_count", &shard_header_t::objects_count)
-        .def_readonly("objects_position", &shard_header_t::objects_position)
-        .def_readonly("objects_size", &shard_header_t::objects_size)
-        .def_readonly("index_position", &shard_header_t::index_position)
-        .def_readonly("index_size", &shard_header_t::index_size)
-        .def_readonly("hash_position", &shard_header_t::hash_position);
+        .def_readonly("version", &shard_header_t::version,
+                      "Version of shard file format")
+        .def_readonly("objects_count", &shard_header_t::objects_count,
+                      "Number of objects in this shard (possibly including "
+                      "deleted objects)")
+        .def_readonly("objects_position", &shard_header_t::objects_position,
+                      "Position in the file of the Objects section")
+        .def_readonly("objects_size", &shard_header_t::objects_size,
+                      "Total size of the Objects section")
+        .def_readonly("index_position", &shard_header_t::index_position,
+                      "Position in the shard file of the Index section")
+        .def_readonly("index_size", &shard_header_t::index_size,
+                      "Totale size of the Index section")
+        .def_readonly(
+            "hash_position", &shard_header_t::hash_position,
+            "Position in the shard file of the HashMapFunction section")
+        .doc() = "Structure for the header of a shard file";
 
     py::class_<shard_index_t>(m, "ShardIndex")
-        .def_property_readonly("key",
-                               [](shard_index_t &s) -> py::bytes {
-                                   return py::bytes(s.key, SHARD_KEY_LEN);
-                               })
-        .def_readonly("object_offset", &shard_index_t::object_offset);
+        .def_property_readonly(
+            "key",
+            [](shard_index_t &s) -> py::bytes {
+                return py::bytes(s.key, SHARD_KEY_LEN);
+            },
+            "Key of the content object")
+        .def_readonly("object_offset", &shard_index_t::object_offset,
+                      "Offset of object (absolute offset, should be in the "
+                      "Objects section)")
+        .doc() = "Structure of an Index element";
 };

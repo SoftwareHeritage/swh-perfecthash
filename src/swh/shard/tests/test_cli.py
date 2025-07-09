@@ -45,7 +45,7 @@ def corrupted_shard_hash(tmp_path):
             key = sha256(data).digest()
             if i == objid:
                 # bitflip: same size, only one bit altered
-                data = data[:-1] + (data[-1] ^ 1).to_bytes()
+                data = data[:-1] + (data[-1] ^ 1).to_bytes(length=1, byteorder="big")
                 altered_key = key
             shard.write(key, data)
 

@@ -66,10 +66,12 @@ def corrupted_shard_size(tmp_path):
             data = bytes((65 + i,)) * 11 * (i + 1)
             key = sha256(data).digest()
             shard.write(key, data)
+            if i == objid:
+                corr_key = key
     # change the size of object at index 7
     with Shard(str(fname)) as s:
-        idx = s.getindex(objid)
-        key = idx.key
+        idx = s.getindex(s.getpos(corr_key))
+        assert corr_key == idx.key
         offset = idx.object_offset
     with open(fname, "r+b") as shardfile:
         shardfile.seek(offset)
@@ -78,7 +80,7 @@ def corrupted_shard_size(tmp_path):
         shardfile.seek(-8, 1)
         shardfile.write(newsize)
 
-    return fname, objid, key
+    return fname, objid, corr_key
 
 
 @pytest.fixture
@@ -90,26 +92,29 @@ def corrupted_shard_offset(tmp_path):
     """
     fname = tmp_path / "corrupted_offset.shard"
     objid = 3
+    keys = []
     with ShardCreator(str(fname), 16) as shard:
         for i in range(16):
             data = bytes((65 + i,)) * 11 * (i + 1)
             key = sha256(data).digest()
             shard.write(key, data)
+            keys.append(key)
 
     # change the offset of object at index 3. For this, use the offset of
     # another existing object (here obj5) so the file is not completely
     # garbage...
     with Shard(str(fname)) as s:
-        key = s.getindex(objid).key
-        use_offset = s.getindex((objid + 2) % 16).object_offset
+        corr_key = keys[objid]
+        obj_pos = s.getpos(corr_key)
+        use_offset = s.getindex(s.getpos(keys[(objid + 2) % 16])).object_offset
         idx_pos = s.header.index_position
 
     with open(fname, "r+b") as shardfile:
         # set the fp at beginning of the offset for object number 3
-        shardfile.seek(idx_pos + 40 * objid + 32)
+        shardfile.seek(idx_pos + 40 * obj_pos + 32)
         shardfile.write(struct.pack(">Q", use_offset))
 
-    return fname, objid, key
+    return fname, objid, corr_key
 
 
 def test_cli():

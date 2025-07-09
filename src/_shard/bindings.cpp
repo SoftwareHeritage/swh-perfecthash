@@ -128,6 +128,17 @@ class ShardReader {
                 "Content read failed. Shard file might be corrupted.");
         return b;
     }
+    uint64_t getpos(const py::bytes key) {
+        uint64_t pos;
+        std::string kbuf = std::string(key);
+        if (kbuf.size() != SHARD_KEY_LEN) {
+            throw std::length_error(
+                "Invalid key size: "s + std::to_string(kbuf.size()) +
+                " (expected: " + std::to_string(SHARD_KEY_LEN) + ")");
+        }
+        shard_cmph_search(this->shard, kbuf.data(), &pos);
+        return pos;
+    }
     void getindex(uint64_t pos, shard_index_t &idx) {
         if (shard_index_get(this->shard, pos, &idx) < 0) {
             if (errno != 0)
@@ -191,6 +202,7 @@ PYBIND11_MODULE(_shard, m) {
                  return idx;
              })
         .def("getsize", &ShardReader::getsize)
+        .def("getpos", &ShardReader::getpos)
         .def("delete",
              [](const std::string &path, const py::bytes key) {
                  std::string_view kbuf = key;

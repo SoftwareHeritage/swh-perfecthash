@@ -99,6 +99,7 @@ int shard_find_object(shard_t *shard, const char *key, uint64_t *object_size);
 int shard_read_object(shard_t *shard, char *object, uint64_t object_size);
 
 int shard_index_get(shard_t *shard, const uint64_t pos, shard_index_t *idx);
+int shard_cmph_search(shard_t *shard, const char *key, uint64_t *pos);
 
 int shard_delete(shard_t *shard, const char *key);
 

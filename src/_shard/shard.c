@@ -386,6 +386,13 @@ int shard_index_get(shard_t *shard, uint64_t pos, shard_index_t *idx) {
     return 0;
 }
 
+int shard_cmph_search(shard_t *shard, const char *key, uint64_t *pos) {
+    debug("shard_cmph_search\n");
+    cmph_uint32 h = cmph_search(shard->hash, key, SHARD_KEY_LEN);
+    *pos = h;
+    return 0;
+}
+
 int shard_hash_save(shard_t *shard) {
     shard->header.hash_position =
         shard->header.index_position + shard->header.index_size;

@@ -24,6 +24,15 @@ def small_shard(tmp_path):
 
 
 @pytest.fixture
+def small_shard_ro(small_shard):
+    small_shard.chmod(0o444)
+    try:
+        yield small_shard
+    finally:
+        small_shard.chmod(0o644)
+
+
+@pytest.fixture
 def valid_shard(tmp_path):
     with ShardCreator(str(tmp_path / "valid.shard"), 16) as shard:
         for i in range(16):
@@ -145,6 +154,72 @@ Shard {small_shard}
 ├─hash
 │ └─position: 1992
 └─end:        2070
+"""
+    )
+
+
+def test_cli_truncate(small_shard):
+    runner = CliRunner()
+    # first time, not validating the operation (hitting return, means saying N)
+    # note: explicitly adding the \n is required for the test to pass on
+    # jenkins (because of no tty or something like that)
+    result = runner.invoke(cli.shard_truncate, [str(small_shard)], input="\n")
+    assert result.exit_code == 0, result.output
+    assert (
+        result.output
+        == f"""\
+Shard file {small_shard} is 100 bytes bigger than necessary
+Truncate? [y/N]: \nSkipped
+"""
+    )
+    # Using explicit \n above to defeat auto-trim feature of code editors...
+
+    # second time to shrink the file
+    result = runner.invoke(cli.shard_truncate, [str(small_shard)], input="y")
+    assert result.exit_code == 0, result.output
+    assert (
+        result.output
+        == f"""\
+Shard file {small_shard} is 100 bytes bigger than necessary
+Truncate? [y/N]: y
+Truncated. New size is 2071
+"""
+    )
+
+    # second time is a noop
+    result = runner.invoke(cli.shard_truncate, [str(small_shard)], input="y")
+    assert result.exit_code == 0, result.output
+    assert (
+        result.output
+        == f"""\
+Shard file {small_shard} does not seem to be overallocated, nothing to do
+"""
+    )
+
+
+@pytest.mark.parametrize("option", ["--assume-yes", "--yes", "-y"])
+def test_cli_truncate_assume_yes(small_shard, option):
+    runner = CliRunner()
+    result = runner.invoke(cli.shard_truncate, [option, str(small_shard)])
+    assert result.exit_code == 0, result.output
+    assert (
+        result.output
+        == f"""\
+Shard file {small_shard} is 100 bytes bigger than necessary
+Truncated. New size is 2071
+"""
+    )
+
+
+def test_cli_truncate_perm_error(small_shard_ro):
+    runner = CliRunner()
+    result = runner.invoke(cli.shard_truncate, ["-y", str(small_shard_ro)])
+    assert result.exit_code == 0, result.output
+    assert (
+        result.output
+        == f"""\
+Shard file {small_shard_ro} is 100 bytes bigger than necessary
+Could not truncate the file. Check file permissions.
 """
     )
 

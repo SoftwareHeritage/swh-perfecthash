@@ -60,6 +60,55 @@ def shard_info(ctx, shard):
             click.echo(f"└─end:        {s.endpos}")
 
 
+@shard_cli_group.command("truncate")
+@click.argument(
+    "shard", required=True, nargs=-1, type=click.Path(exists=True, dir_okay=False)
+)
+@click.option(
+    "--assume-yes",
+    "--yes",
+    "-y",
+    is_flag=True,
+    default=False,
+    help=(
+        "Do not ask for confirmation before actually truncating "
+        "shard files (default is to ask)"
+    ),
+)
+@click.pass_context
+def shard_truncate(ctx, shard, assume_yes):
+    "Truncate shard file to its minimal size, if needed"
+
+    import os
+
+    from swh.shard import Shard
+
+    for shardfile in shard:
+        with Shard(shardfile) as s:
+            realsize = s.endpos + 1
+        fsize = os.stat(shardfile).st_size
+        if fsize > realsize:
+            click.echo(
+                f"Shard file {shardfile} is {fsize-realsize} bytes bigger than necessary"
+            )
+            if assume_yes or click.confirm(
+                click.style("Truncate?", fg="yellow", bold=True)
+            ):
+                try:
+                    with open(shardfile, "r+b") as fobj:
+                        fobj.seek(realsize)
+                        fobj.truncate()
+                    click.echo(f"Truncated. New size is {realsize}")
+                except OSError:
+                    click.echo("Could not truncate the file. Check file permissions.")
+            else:
+                click.echo("Skipped")
+        else:
+            click.echo(
+                f"Shard file {shardfile} does not seem to be overallocated, nothing to do"
+            )
+
+
 @shard_cli_group.command("create")
 @click.argument(
     "shard", required=True, type=click.Path(exists=False, dir_okay=False, writable=True)

@@ -94,6 +94,7 @@ class ShardReader {
             PyErr_SetFromErrno(PyExc_OSError);
             throw py::error_already_set();
         }
+        this->endpos = shard_tell(this->shard) - 1;
     }
     ~ShardReader() {
         // beware the close method (shard_close actually) may fail (not sure
@@ -165,6 +166,7 @@ class ShardReader {
         return size;
     }
     shard_t *shard;
+    uint64_t endpos;
 };
 
 PYBIND11_MODULE(_shard, m) {
@@ -220,6 +222,8 @@ PYBIND11_MODULE(_shard, m) {
                                [](ShardReader &s) -> const shard_header_t & {
                                    return s.shard->header;
                                })
+        .def_property_readonly(
+            "endpos", [](ShardReader &s) -> const uint64_t { return s.endpos; })
         .def(
             "getindex",
             [](ShardReader &s, uint64_t pos) -> shard_index_t {

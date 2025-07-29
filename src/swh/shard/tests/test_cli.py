@@ -17,6 +17,9 @@ def small_shard(tmp_path):
     with ShardCreator(str(tmp_path / "small.shard"), 16) as shard:
         for i in range(16):
             shard.write(bytes.fromhex(f"{i:-064X}"), bytes((65 + i,)) * 42)
+    # add a bit of extra padding, to check shard end pos computation is OK
+    with (tmp_path / "small.shard").open("ab") as f:
+        f.write(b"\x00" * 100)
     return tmp_path / "small.shard"
 
 
@@ -139,8 +142,9 @@ Shard {small_shard}
 ├─index
 │ ├─position: 1312
 │ └─size:     680
-└─hash
-  └─position: 1992
+├─hash
+│ └─position: 1992
+└─end:        2070
 """
     )
 

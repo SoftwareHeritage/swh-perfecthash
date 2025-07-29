@@ -55,8 +55,9 @@ def shard_info(ctx, shard):
             click.echo("├─index")
             click.echo(f"│ ├─position: {h.index_position}")
             click.echo(f"│ └─size:     {h.index_size}")
-            click.echo("└─hash")
-            click.echo(f"  └─position: {h.hash_position}")
+            click.echo("├─hash")
+            click.echo(f"│ └─position: {h.hash_position}")
+            click.echo(f"└─end:        {s.endpos}")
 
 
 @shard_cli_group.command("create")

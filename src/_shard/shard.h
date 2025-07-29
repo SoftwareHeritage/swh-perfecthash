@@ -105,6 +105,7 @@ int shard_delete(shard_t *shard, const char *key);
 
 int shard_read(shard_t *shard, void *ptr, uint64_t size);
 int shard_seek(shard_t *shard, uint64_t offset, int whence);
+uint64_t shard_tell(shard_t *shard);
 
 #ifdef __cplusplus
 }

@@ -1,19 +1,19 @@
 Shard File Format for the Software Heritage Object Storage
 ==========================================================
 
-This module implement the support and tooling to manipulate SWH Shard files
+This module implements the support and tooling to manipulate SWH Shard files
 based on a perfect hash table, typically used by the software heritage object
 storage.
 
-It is both a Python extension that can be used as a library to manuipulate SWH
+It is both a Python extension that can be used as a library to manipulate SWH
 shard files, and a set of command line tools.
 
 Quick Start
 -----------
 
-This packages uses pybind11 to build the wrapper around the cmph minimal perfect
+This package uses pybind11 to build the wrapper around the cmph minimal perfect
 hashmap library. To build the binary extension, in addition to the python
-development tools, you will need cmph, gtest and valgrind. On de Debian
+development tools, you will need cmph, gtest and valgrind. On a Debian
 system, you can install these using:
 
 .. code-block:: shell

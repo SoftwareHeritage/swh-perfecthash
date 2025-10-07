@@ -89,7 +89,7 @@ def shard_truncate(ctx, shard, assume_yes):
         fsize = os.stat(shardfile).st_size
         if fsize > realsize:
             click.echo(
-                f"Shard file {shardfile} is {fsize-realsize} bytes bigger than necessary"
+                f"Shard file {shardfile} is {fsize - realsize} bytes bigger than necessary"
             )
             if assume_yes or click.confirm(
                 click.style("Truncate?", fg="yellow", bold=True)

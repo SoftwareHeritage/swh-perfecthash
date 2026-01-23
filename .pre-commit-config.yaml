@@ -57,3 +57,15 @@ repos:
     hooks:
       - id: clang-format
         types_or: [c++, c, cuda]
+
+  - repo: https://github.com/nanoufo/copyright-hook
+    rev: v1.1.0
+    hooks:
+      - id: update-copyright
+        args: [--required]
+        files: ^.*\.(py|c|cpp|h)$
+        exclude: >
+          (?x)^(
+            .*__init__.py|
+            docs/conf.py
+          )$

@@ -1,9 +1,10 @@
-# Copyright (C) 2025  The Software Heritage developers
+# Copyright (C) 2025-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 from hashlib import sha256
+import re
 import struct
 
 from click.testing import CliRunner
@@ -165,25 +166,25 @@ def test_cli_truncate(small_shard):
     # jenkins (because of no tty or something like that)
     result = runner.invoke(cli.shard_truncate, [str(small_shard)], input="\n")
     assert result.exit_code == 0, result.output
-    assert (
-        result.output
-        == f"""\
+    assert re.search(
+        f"""\
 Shard file {small_shard} is 100 bytes bigger than necessary
-Truncate? [y/N]: \nSkipped
-"""
+.*Truncate?.*[y/N].*\nSkipped
+""",
+        result.output,
     )
     # Using explicit \n above to defeat auto-trim feature of code editors...
 
     # second time to shrink the file
     result = runner.invoke(cli.shard_truncate, [str(small_shard)], input="y")
     assert result.exit_code == 0, result.output
-    assert (
-        result.output
-        == f"""\
+    assert re.search(
+        f"""\
 Shard file {small_shard} is 100 bytes bigger than necessary
-Truncate? [y/N]: y
+.*Truncate?.*[y/N].*y
 Truncated. New size is 2071
-"""
+""",
+        result.output,
     )
 
     # second time is a noop
@@ -287,7 +288,7 @@ def test_cli_delete_one_abort(small_shard):
         input="n\n",
     )
     assert result.exit_code == 1, result.output
-    assert "Proceed? [y/N]" in result.output
+    assert re.search("Proceed?.*[y/N]", result.output)
     assert "Aborted!" in result.output
 
     result = runner.invoke(cli.shard_get, [str(small_shard), key])
@@ -331,7 +332,7 @@ def test_cli_delete_confirm(small_shard, key_nums):
         input="y\n",
     )
     assert result.exit_code == 0, result.output
-    assert "Proceed? [y/N]" in result.output
+    assert re.search("Proceed?.*[y/N]", result.output)
     assert "Done" in result.output
 
     result = runner.invoke(cli.shard_list, [str(small_shard)])

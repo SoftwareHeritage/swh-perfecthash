@@ -141,9 +141,7 @@ def test_cli_info(small_shard):
     runner = CliRunner()
     result = runner.invoke(cli.shard_info, [str(small_shard)])
     assert result.exit_code == 0
-    assert (
-        result.output
-        == f"""\
+    assert result.output == f"""\
 Shard {small_shard}
 ├─version:    1
 ├─objects:    16
@@ -156,7 +154,6 @@ Shard {small_shard}
 │ └─position: 1992
 └─end:        2070
 """
-    )
 
 
 def test_cli_truncate(small_shard):
@@ -190,12 +187,9 @@ Truncated. New size is 2071
     # second time is a noop
     result = runner.invoke(cli.shard_truncate, [str(small_shard)], input="y")
     assert result.exit_code == 0, result.output
-    assert (
-        result.output
-        == f"""\
+    assert result.output == f"""\
 Shard file {small_shard} does not seem to be overallocated, nothing to do
 """
-    )
 
 
 @pytest.mark.parametrize("option", ["--assume-yes", "--yes", "-y"])
@@ -203,26 +197,20 @@ def test_cli_truncate_assume_yes(small_shard, option):
     runner = CliRunner()
     result = runner.invoke(cli.shard_truncate, [option, str(small_shard)])
     assert result.exit_code == 0, result.output
-    assert (
-        result.output
-        == f"""\
+    assert result.output == f"""\
 Shard file {small_shard} is 100 bytes bigger than necessary
 Truncated. New size is 2071
 """
-    )
 
 
 def test_cli_truncate_perm_error(small_shard_ro):
     runner = CliRunner()
     result = runner.invoke(cli.shard_truncate, ["-y", str(small_shard_ro)])
     assert result.exit_code == 0, result.output
-    assert (
-        result.output
-        == f"""\
+    assert result.output == f"""\
 Shard file {small_shard_ro} is 100 bytes bigger than necessary
 Could not truncate the file. Check file permissions.
 """
-    )
 
 
 def test_cli_ls(small_shard):
